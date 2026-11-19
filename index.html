@@ -523,6 +523,61 @@
       background-color: var(--danger-bg) !important;
       box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.25) !important;
     }
+  
+    /* ══════════════════════════════════════════════════════
+       AI ASSISTANT & CHAT STYLES
+    ══════════════════════════════════════════════════════ */
+    .ai-fab-btn {
+      background: linear-gradient(135deg, #2563EB 0%, #7C3AED 50%, #4F46E5 100%);
+      box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.45), 0 8px 10px -6px rgba(79, 70, 229, 0.35);
+      transition: all 0.25s var(--easing);
+    }
+    .ai-fab-btn:hover {
+      transform: translateY(-2px) scale(1.04);
+      box-shadow: 0 14px 28px -5px rgba(79, 70, 229, 0.55), 0 10px 10px -5px rgba(79, 70, 229, 0.45);
+    }
+    .ai-chat-window {
+      box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.08);
+      backdrop-filter: blur(14px);
+      z-index: 999;
+    }
+    [data-theme="dark"] .ai-chat-window {
+      box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.12);
+    }
+    .ai-mic-pulse {
+      animation: micPulse 1.3s infinite ease-in-out;
+    }
+    @keyframes micPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      50% { transform: scale(1.1); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+    }
+    .ai-msg-bubble-user {
+      background: linear-gradient(135deg, #2563EB, #1D4ED8);
+      color: #FFFFFF;
+      border-radius: 18px 18px 4px 18px;
+    }
+    .ai-msg-bubble-bot {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 18px 18px 18px 4px;
+    }
+    .ai-takeoff-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .ai-typing-dot {
+      animation: typingBounce 1.2s infinite ease-in-out;
+    }
+    .ai-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .ai-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes typingBounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-5px); }
+    }
+
   </style>
 </head>
 <body>
@@ -998,6 +1053,18 @@ const S = {
   monthlyCount: getMonthlyBudgetCount(),
   brand: getStoredBrand(),
   projects: getStoredProjects(),
+  aiChatOpen: false,
+  aiApiKeyOpen: false,
+  aiRecording: false,
+  aiLoading: false,
+  geminiApiKey: localStorage.getItem('presupuestapp_gemini_key') || '',
+  aiMessages: [
+    {
+      role: 'assistant',
+      text: '¡Hola! Soy tu **Asistente Técnico de Obras**. 🏗️✨\n\nPuedes escribirme o presionar el **micrófono 🎤** para dictar lo que necesitas hacer (ej: *"Instalar 8 bocas de luz con tablero y térmicas"*, *"Tabique de drywall de 15m² con aislación"*, *"Pintar 50m² con látex lavable"* o *"Instalar baño completo con termofusión"*).\n\nAnalizaré las cantidades, mermas de materiales y mano de obra para armar tus partidas y agregarlas con 1 solo clic a tu presupuesto.',
+      items: null
+    }
+  ],
   currentProjectId: storedDraft ? (storedDraft.currentProjectId || null) : null,
   dualMode: storedDraft ? (storedDraft.dualMode !== undefined ? storedDraft.dualMode : true) : true,
   finalOption: storedDraft ? (storedDraft.finalOption || 'standard') : 'standard',
@@ -1197,6 +1264,12 @@ function html() {
         `}
       </div>
     </div>
+
+    <!-- FLOATING AI ASSISTANT BUTTON -->
+    ${aiFloatingButton()}
+
+    <!-- AI ASSISTANT CHAT WINDOW -->
+    ${S.aiChatOpen ? aiChatModal() : ''}
 
     <!-- MODALS -->
     ${S.modal ? modal() : ''}
@@ -3280,6 +3353,588 @@ function newBudget() {
 /* ═══════════════════════════════════════════════════════════
    BOOT INITIALIZATION
 ═══════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   AI ASSISTANT MODULE (CHAT, SPEECH & GEMINI API / LOCAL ENGINE)
+═══════════════════════════════════════════════════════════ */
+
+let aiSpeechInstance = null;
+
+function aiFloatingButton() {
+  if (S.aiChatOpen) return '';
+  return `
+    <div class="fixed bottom-6 right-6 z-[990] flex items-center">
+      <button onclick="toggleAiChat()" class="ai-fab-btn flex items-center gap-2.5 px-4 py-3 text-white rounded-full font-semibold text-xs sm:text-sm tracking-wide">
+        <span class="relative flex h-2.5 w-2.5">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-300 opacity-80"></span>
+          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400"></span>
+        </span>
+        ${ic('sparkles', 18)}
+        <span>Asistente IA de Obra</span>
+      </button>
+    </div>
+  `;
+}
+
+function toggleAiChat() {
+  S.aiChatOpen = !S.aiChatOpen;
+  render();
+  if (S.aiChatOpen) {
+    setTimeout(() => {
+      scrollAiChatToBottom();
+      const input = document.getElementById('ai-chat-input');
+      if (input) input.focus();
+    }, 100);
+  } else {
+    if (S.aiRecording && aiSpeechInstance) {
+      aiSpeechInstance.stop();
+      S.aiRecording = false;
+    }
+  }
+}
+
+function toggleAiApiKeyPanel() {
+  S.aiApiKeyOpen = !S.aiApiKeyOpen;
+  render();
+}
+
+function saveGeminiApiKey() {
+  const input = document.getElementById('ai-gemini-key-input');
+  if (!input) return;
+  const key = input.value.trim();
+  S.geminiApiKey = key;
+  if (key) {
+    localStorage.setItem('presupuestapp_gemini_key', key);
+    alert('✅ Clave de Google Gemini guardada con éxito.');
+  } else {
+    localStorage.removeItem('presupuestapp_gemini_key');
+    alert('ℹ️ Clave eliminada. El asistente usará el Motor Local Inteligente.');
+  }
+  S.aiApiKeyOpen = false;
+  render();
+}
+
+function scrollAiChatToBottom() {
+  const container = document.getElementById('ai-chat-messages-container');
+  if (container) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+function aiChatModal() {
+  const isKeyActive = !!S.geminiApiKey;
+  const cInfo = COUNTRIES[S.country] || COUNTRIES.ar;
+
+  return `
+    <div class="ai-chat-window fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-[430px] max-w-[calc(100vw-24px)] h-[620px] max-h-[calc(100vh-32px)] flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden animate-in slide-in-from-bottom-5 duration-200">
+      
+      <!-- HEADER -->
+      <div class="px-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white flex items-center justify-between shrink-0 shadow-sm">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+            ${ic('sparkles', 18)}
+          </div>
+          <div>
+            <div class="font-bold text-sm tracking-tight flex items-center gap-2">
+              Asistente IA de Obra
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ${isKeyActive ? 'bg-emerald-500/80 text-white' : 'bg-white/20 text-blue-100'}">
+                ${isKeyActive ? '● Gemini 2.5' : '⚡ Motor Local'}
+              </span>
+            </div>
+            <div class="text-[11px] text-blue-100/90 font-medium">Asesor técnico de cómputos y cotización</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <button onclick="toggleAiApiKeyPanel()" class="p-1.5 hover:bg-white/20 rounded-lg transition" title="Configurar API Key de Gemini">
+            ${ic('settings', 16)}
+          </button>
+          <button onclick="toggleAiChat()" class="p-1.5 hover:bg-white/20 rounded-lg transition" title="Cerrar chat">
+            ${ic('x', 18)}
+          </button>
+        </div>
+      </div>
+
+      <!-- GEMINI API KEY SETTINGS POPOVER -->
+      ${S.aiApiKeyOpen ? `
+        <div class="p-4 bg-slate-50 dark:bg-slate-800/95 border-b border-slate-200 dark:border-slate-700 text-xs shrink-0 animate-in slide-in-from-top-2">
+          <div class="font-bold text-slate-800 dark:text-slate-100 mb-1 flex items-center justify-between">
+            <span>🔑 Google Gemini API Key</span>
+            <span class="text-[10px] font-normal text-slate-500">Opcional</span>
+          </div>
+          <p class="text-slate-600 dark:text-slate-400 text-[11px] mb-2 leading-relaxed">
+            Ingresa tu clave de Gemini para respuestas con IA generativa de Google (gemini-2.5-flash). Si la dejas vacía, se usará el <b>Motor Local Inteligente</b> sin costo ni límites.
+          </p>
+          <div class="flex gap-2 mb-2">
+            <input id="ai-gemini-key-input" type="password" value="${S.geminiApiKey}" placeholder="Pega tu clave AIzaSy..." class="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-xs focus:ring-2 focus:ring-blue-500 outline-none" />
+            <button onclick="saveGeminiApiKey()" class="btn btn-primary btn-sm px-3 text-xs font-semibold">Guardar</button>
+          </div>
+          <div class="flex items-center justify-between text-[11px]">
+            <a href="https://aistudio.google.com/apikey" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+              ${ic('external-link', 12)} Obtener clave gratis en Google AI Studio
+            </a>
+            ${S.geminiApiKey ? `<button onclick="document.getElementById('ai-gemini-key-input').value='';saveGeminiApiKey();" class="text-red-500 hover:underline">Borrar clave</button>` : ''}
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- MESSAGES SCROLL CONTAINER -->
+      <div id="ai-chat-messages-container" class="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+        ${S.aiMessages.map((msg, idx) => renderAiChatMessage(msg, idx, cInfo)).join('')}
+
+        ${S.aiLoading ? `
+          <div class="flex items-start gap-2.5">
+            <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-600 to-purple-600 text-white flex items-center justify-center shrink-0">
+              ${ic('sparkles', 13)}
+            </div>
+            <div class="ai-msg-bubble-bot p-3 flex items-center gap-1.5 shadow-sm">
+              <span class="text-[11px] text-slate-500 mr-1 font-medium">Calculando cómputo técnico...</span>
+              <span class="w-1.5 h-1.5 rounded-full bg-blue-600 ai-typing-dot"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-purple-600 ai-typing-dot"></span>
+              <span class="w-1.5 h-1.5 rounded-full bg-indigo-600 ai-typing-dot"></span>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+
+      <!-- SUGGESTION CHIPS -->
+      ${S.aiMessages.length <= 2 ? `
+        <div class="px-3 py-2 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800/80 flex items-center gap-1.5 overflow-x-auto text-[11px] shrink-0 no-scrollbar">
+          <button onclick="sendQuickAiPrompt('8 bocas de luz con cañería y térmicas')" class="whitespace-nowrap px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full hover:border-blue-500 text-slate-700 dark:text-slate-300 font-medium transition">⚡ 8 bocas de luz</button>
+          <button onclick="sendQuickAiPrompt('Pared de drywall de 15 metros cuadrados con aislación')" class="whitespace-nowrap px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full hover:border-blue-500 text-slate-700 dark:text-slate-300 font-medium transition">🧱 15m² Drywall</button>
+          <button onclick="sendQuickAiPrompt('Pintar 50 metros cuadrados con látex lavable interior')" class="whitespace-nowrap px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full hover:border-blue-500 text-slate-700 dark:text-slate-300 font-medium transition">🎨 Pintar 50m²</button>
+          <button onclick="sendQuickAiPrompt('Baño completo con cañería de termofusión y desagües')" class="whitespace-nowrap px-2.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full hover:border-blue-500 text-slate-700 dark:text-slate-300 font-medium transition">💧 Baño completo</button>
+        </div>
+      ` : ''}
+
+      <!-- LISTENING STATUS BANNER -->
+      ${S.aiRecording ? `
+        <div class="bg-red-500/10 border-t border-red-500/20 px-3.5 py-2 flex items-center justify-between text-xs text-red-600 dark:text-red-400 font-semibold shrink-0">
+          <span class="flex items-center gap-2">
+            <span class="h-2.5 w-2.5 rounded-full bg-red-600 animate-ping"></span>
+            🎙️ Escuchando tu voz... Habla tu idea de obra
+          </span>
+          <button onclick="toggleSpeechRecognition()" class="text-xs bg-red-600 text-white px-2.5 py-0.5 rounded-full hover:bg-red-700 transition">
+            Listo / Detener
+          </button>
+        </div>
+      ` : ''}
+
+      <!-- INPUT BAR -->
+      <div class="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 shrink-0">
+        <button id="ai-mic-btn" onclick="toggleSpeechRecognition()" title="${S.aiRecording ? 'Detener grabación' : 'Hablar por micrófono'}" class="p-2.5 rounded-xl transition shrink-0 ${S.aiRecording ? 'bg-red-500 text-white ai-mic-pulse' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'}">
+          ${ic('mic', 18)}
+        </button>
+
+        <input id="ai-chat-input" type="text" placeholder="${S.aiRecording ? 'Escuchando tu voz...' : 'Escribe o dicta tu idea de obra...'}" onkeydown="if(event.key==='Enter') sendAiMessage()" class="flex-1 px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-blue-500 rounded-xl text-xs text-slate-800 dark:text-slate-100 outline-none transition" />
+
+        <button onclick="sendAiMessage()" ${S.aiLoading ? 'disabled' : ''} class="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition disabled:opacity-50 shrink-0">
+          ${S.aiLoading ? ic('loader-2', 18, 'animate-spin') : ic('send', 18)}
+        </button>
+      </div>
+
+    </div>
+  `;
+}
+
+function renderAiChatMessage(msg, idx, cInfo) {
+  if (msg.role === 'user') {
+    return `
+      <div class="flex justify-end">
+        <div class="ai-msg-bubble-user p-3 max-w-[85%] text-xs shadow-sm leading-relaxed whitespace-pre-wrap">
+          ${escapeHtml(msg.text)}
+        </div>
+      </div>
+    `;
+  }
+
+  // Assistant message
+  const formattedText = formatAiMarkdown(msg.text);
+
+  return `
+    <div class="flex items-start gap-2.5">
+      <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-600 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
+        ${ic('sparkles', 13)}
+      </div>
+      <div class="space-y-2.5 flex-1 max-w-[88%]">
+        <div class="ai-msg-bubble-bot p-3.5 text-xs shadow-sm leading-relaxed space-y-1.5">
+          ${formattedText}
+        </div>
+
+        <!-- SUGGESTED BUDGET ITEMS CARD -->
+        ${msg.items && msg.items.length > 0 ? `
+          <div class="ai-takeoff-card p-3 shadow-md border-purple-200 dark:border-purple-900/50">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800 mb-2">
+              <span class="font-bold text-[11px] text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
+                ${ic('calculator', 13)} Desglose de Partidas (${msg.items.length})
+              </span>
+              <span class="text-[10px] text-slate-500 font-semibold">${cInfo.sym} ${formatNum(calcAiItemsTotal(msg.items))}</span>
+            </div>
+
+            <div class="space-y-1.5 max-h-[160px] overflow-y-auto pr-1 text-[11px]">
+              ${msg.items.map(it => `
+                <div class="flex items-center justify-between py-1 border-b border-slate-50 dark:border-slate-800/50">
+                  <div class="truncate mr-2">
+                    <span class="font-medium text-slate-800 dark:text-slate-200">${escapeHtml(it.name)}</span>
+                    <span class="text-[10px] text-slate-400 block">${it.qty} ${it.unit}</span>
+                  </div>
+                  <div class="text-right shrink-0">
+                    <span class="font-bold text-slate-700 dark:text-slate-300">${cInfo.sym} ${formatNum((it.unitPrice + it.laborUnitPrice) * it.qty)}</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+
+            <button onclick="addAiItemsToBudget(${idx})" class="w-full mt-3 py-2 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-lg shadow-sm hover:shadow transition flex items-center justify-center gap-2 text-xs">
+              ${ic('plus-circle', 15)} <span>Cargar estas partidas al presupuesto</span>
+            </button>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function formatAiMarkdown(text) {
+  if (!text) return '';
+  let formatted = escapeHtml(text);
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  formatted = formatted.replace(/^\* (.*?)$/gm, '• $1');
+  formatted = formatted.replace(/^- (.*?)$/gm, '• $1');
+  formatted = formatted.replace(/\n/g, '<br/>');
+  return formatted;
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function calcAiItemsTotal(items) {
+  if (!items) return 0;
+  return items.reduce((acc, it) => acc + ((it.unitPrice || 0) + (it.laborUnitPrice || 0)) * (it.qty || 1), 0);
+}
+
+function sendQuickAiPrompt(text) {
+  const input = document.getElementById('ai-chat-input');
+  if (input) input.value = text;
+  sendAiMessage();
+}
+
+async function sendAiMessage() {
+  const input = document.getElementById('ai-chat-input');
+  if (!input) return;
+  const userText = input.value.trim();
+  if (!userText || S.aiLoading) return;
+
+  // Add user message
+  S.aiMessages.push({ role: 'user', text: userText, items: null });
+  input.value = '';
+  S.aiLoading = true;
+  render();
+  setTimeout(scrollAiChatToBottom, 50);
+
+  try {
+    let result;
+    if (S.geminiApiKey) {
+      result = await callGeminiApi(userText);
+    } else {
+      result = await localAiParser(userText);
+    }
+
+    S.aiMessages.push({
+      role: 'assistant',
+      text: result.text,
+      items: result.items
+    });
+  } catch (err) {
+    console.error('Error in AI Assistant:', err);
+    S.aiMessages.push({
+      role: 'assistant',
+      text: 'Ocurrió un inconveniente al procesar la respuesta. He activado el modo de respaldo local para estimar tus partidas.',
+      items: localFallbackItems(userText)
+    });
+  } finally {
+    S.aiLoading = false;
+    render();
+    setTimeout(scrollAiChatToBottom, 100);
+  }
+}
+
+/* ─── WEB SPEECH API (AUDIO / VOZ) ───────────────────────── */
+function toggleSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('Tu navegador actual no soporta la Web Speech API para reconocimiento de voz directo. Te recomendamos usar Google Chrome, Microsoft Edge o Safari.');
+    return;
+  }
+
+  if (S.aiRecording && aiSpeechInstance) {
+    aiSpeechInstance.stop();
+    S.aiRecording = false;
+    render();
+    return;
+  }
+
+  try {
+    aiSpeechInstance = new SpeechRecognition();
+    aiSpeechInstance.continuous = false;
+    aiSpeechInstance.interimResults = true;
+    aiSpeechInstance.lang = S.lang === 'en' ? 'en-US' : (S.country === 'es' ? 'es-ES' : 'es-AR');
+
+    aiSpeechInstance.onstart = () => {
+      S.aiRecording = true;
+      render();
+    };
+
+    aiSpeechInstance.onresult = (e) => {
+      let finalTranscript = '';
+      for (let i = e.resultIndex; i < e.results.length; ++i) {
+        finalTranscript += e.results[i][0].transcript;
+      }
+      const input = document.getElementById('ai-chat-input');
+      if (input && finalTranscript) {
+        input.value = finalTranscript;
+      }
+    };
+
+    aiSpeechInstance.onerror = (e) => {
+      console.warn('Speech error:', e.error);
+      S.aiRecording = false;
+      render();
+      if (e.error === 'not-allowed') {
+        alert('Permiso de micrófono denegado. Permite el acceso al micrófono en la barra de direcciones de tu navegador para dictar tus obras.');
+      }
+    };
+
+    aiSpeechInstance.onend = () => {
+      S.aiRecording = false;
+      render();
+      const input = document.getElementById('ai-chat-input');
+      if (input && input.value.trim().length > 3) {
+        // Auto-send voice dictation after pause
+        sendAiMessage();
+      }
+    };
+
+    aiSpeechInstance.start();
+  } catch (err) {
+    console.error('Error starting speech:', err);
+    S.aiRecording = false;
+    render();
+  }
+}
+
+/* ─── GOOGLE GEMINI API CONNECTOR ────────────────────────── */
+async function callGeminiApi(prompt) {
+  const cInfo = COUNTRIES[S.country] || COUNTRIES.ar;
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + encodeURIComponent(S.geminiApiKey);
+
+  const fence = '```';
+  const systemInstruction = 'Eres el Asistente Técnico y Estimador de Presupuestos de Obras de PresupuestAPP.\n' +
+    'País del usuario: ' + S.country.toUpperCase() + ' (Moneda: ' + cInfo.sym + ' ' + cInfo.curr + ').\n' +
+    'Tu función es asesorar de forma amable, experta y concisa sobre materiales, mermas (+10% estándar) y mano de obra necesaria para la obra o reforma consultada.\n' +
+    'SIEMPRE debes incluir al final de tu respuesta un bloque JSON estricto con las partidas calculadas con el siguiente formato exacto:\n' +
+    fence + 'json:items\n' +
+    '[\n' +
+    '  {\n' +
+    '    "name": "Nombre descriptivo del material o mano de obra",\n' +
+    '    "unit": "m / m2 / un / kg / L / kit",\n' +
+    '    "qty": 10,\n' +
+    '    "unitPrice": 1200,\n' +
+    '    "laborUnitPrice": 800,\n' +
+    '    "category": "electricidad | paredes | plomeria | pintura | libre"\n' +
+    '  }\n' +
+    ']\n' +
+    fence + '\n' +
+    'Usa valores monetarios realistas acorde al país (' + cInfo.sym + ' ' + cInfo.curr + ').';
+
+  const payload = {
+    contents: [
+      { role: 'user', parts: [{ text: systemInstruction + '\n\nConsulta del usuario: "' + prompt + '"' }] }
+    ]
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error('Gemini API Error (' + res.status + '): ' + errorText);
+  }
+
+  const data = await res.json();
+  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+  // Extract JSON items block if present
+  let items = [];
+  let displayText = rawText;
+
+  const jsonRegex = new RegExp('```(?:json:items|json)?\\s*([\\s\\S]*?)```', 'i');
+  const jsonMatch = rawText.match(jsonRegex);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[1].trim());
+      if (Array.isArray(parsed)) items = parsed;
+      displayText = rawText.replace(jsonMatch[0], '').trim();
+    } catch (e) {
+      console.warn('Could not parse JSON items from Gemini response:', e);
+    }
+  }
+
+  if (items.length === 0) {
+    items = localFallbackItems(prompt);
+  }
+
+  return { text: displayText, items };
+}
+
+/* ─── MOTOR LOCAL INTELIGENTE (OFFLINE / SIN API KEY) ────── */
+async function localAiParser(prompt) {
+  // Simulate natural brief AI calculation latency
+  await new Promise(r => setTimeout(r, 600));
+
+  const lower = prompt.toLowerCase();
+  const cInfo = COUNTRIES[S.country] || COUNTRIES.ar;
+
+  // Extract quantity numbers
+  const numMatch = lower.match(/(\d+(?:[.,]\d+)?)/);
+  const qtyNum = numMatch ? parseFloat(numMatch[1].replace(',', '.')) : 0;
+
+  let category = 'libre';
+  let explanation = '';
+  let items = [];
+
+  if (lower.includes('luz') || lower.includes('boca') || lower.includes('electr') || lower.includes('enchufe') || lower.includes('toma') || lower.includes('termica') || lower.includes('cable')) {
+    category = 'electricidad';
+    const bocas = qtyNum > 0 ? qtyNum : 6;
+    explanation = `He preparado el cómputo para **${bocas} bocas de instalación eléctrica** completa. Incluye cajas embutidas, cañerías corrugadas, cableado reglamentario normalizado de 2.5mm² para tomas y 1.5mm² para iluminación, tablero de protección con interruptor termomagnético bipolar y mano de obra por boca.`;
+    items = [
+      { name: 'Caja rectangular 5x10 embutir', unit: 'un', qty: bocas, unitPrice: getCatPrice('electricidad', 'caja_rect', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
+      { name: 'Caja octogonal de techo', unit: 'un', qty: Math.ceil(bocas * 0.5), unitPrice: getCatPrice('electricidad', 'caja_octo', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
+      { name: 'Caño corrugado ignífugo 3/4"', unit: 'm', qty: Math.round(bocas * 5), unitPrice: getCatPrice('electricidad', 'cano_corr', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
+      { name: 'Cable unipolar 2.5mm² (Tomas)', unit: 'm', qty: Math.round(bocas * 12), unitPrice: getCatPrice('electricidad', 'cable_25', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
+      { name: 'Cable unipolar 1.5mm² (Luces)', unit: 'm', qty: Math.round(bocas * 8), unitPrice: getCatPrice('electricidad', 'cable_15', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
+      { name: 'Toma corriente 10A / Punto', unit: 'un', qty: bocas, unitPrice: getCatPrice('electricidad', 'modulo_10a', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
+      { name: 'Tablero 4-8 bocas + Térmica bipolar', unit: 'kit', qty: 1, unitPrice: getCatPrice('electricidad', 'tablero_prin', 'mat') + getCatPrice('electricidad', 'termica_bip', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
+      { name: 'Mano de obra instalación eléctrica por boca', unit: 'boca', qty: bocas, unitPrice: 0, laborUnitPrice: Math.round(getCatPrice('electricidad', 'modulo_10a', 'mo') * 2.5), category: 'electricidad' }
+    ];
+  } else if (lower.includes('drywall') || lower.includes('durlock') || lower.includes('placa') || lower.includes('tabique') || lower.includes('pared') || lower.includes('yeso')) {
+    category = 'paredes';
+    const m2 = qtyNum > 0 ? qtyNum : 15;
+    const placas = Math.ceil((m2 / 2.88) * 1.10);
+    const montantes = Math.ceil(m2 * 0.85);
+    const soleras = Math.ceil(m2 * 0.45);
+    const masilla = Math.ceil(m2 * 1.5);
+    explanation = `He calculado el despiece técnico para **${m2} m² de tabique en sistema Drywall** (emplacado estándar). Contempla estructura de chapa galvanizada con montantes cada 40cm, soleras perimetrales, fijaciones T1/T2, cinta de papel microperforada, masilla de juntas, lana de vidrio acústica y mano de obra de armado.`;
+    items = [
+      { name: 'Placa yeso estándar 12.5mm', unit: 'un', qty: placas, unitPrice: getCatPrice('paredes', 'placa_std', 'mat'), laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Montante galvanizado 69mm x 2.60m', unit: 'un', qty: montantes, unitPrice: getCatPrice('paredes', 'montante_69', 'mat'), laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Solera galvanizada 70mm x 2.60m', unit: 'un', qty: soleras, unitPrice: getCatPrice('paredes', 'solera_70', 'mat'), laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Tornillos T1 aguja (x100)', unit: 'paq', qty: Math.ceil(m2 / 12), unitPrice: getCatPrice('paredes', 'tornillos_t1', 'mat'), laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Tornillos T2 aguja (x100)', unit: 'paq', qty: Math.ceil(m2 / 6), unitPrice: getCatPrice('paredes', 'tornillos_t2', 'mat'), laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Cinta de papel para juntas (75m)', unit: 'rollo', qty: Math.ceil(m2 / 30), unitPrice: getCatPrice('paredes', 'cinta_papel', 'mat'), laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Masilla para juntas lista', unit: 'kg', qty: masilla, unitPrice: getCatPrice('paredes', 'masilla_kg', 'mat'), laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Lana de vidrio aislante 50mm', unit: 'm²', qty: m2, unitPrice: getCatPrice('paredes', 'lana_vidrio', 'mat'), laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Mano de obra armado y emplacado Drywall', unit: 'm²', qty: m2, unitPrice: 0, laborUnitPrice: Math.round(getCatPrice('paredes', 'placa_std', 'mo') * 1.5), category: 'paredes' }
+    ];
+  } else if (lower.includes('pint') || lower.includes('latex') || lower.includes('rodillo') || lower.includes('enduido')) {
+    category = 'pintura';
+    const m2 = qtyNum > 0 ? qtyNum : 40;
+    explanation = `He calculado el cómputo de pintura para **${m2} m² de superficie** a 2 manos. Incluye látex lavable de alto poder cubritivo, fijador sellador concentrado, enduido plástico para enderezar imperfecciones, lijas, cinta de pintor y mano de obra de aplicación.`;
+    items = [
+      { name: 'Látex lavable interior (20L)', unit: 'balde', qty: Math.ceil(m2 / 70), unitPrice: getCatPrice('pintura', 'latex_int_20', 'mat'), laborUnitPrice: 0, category: 'pintura' },
+      { name: 'Fijador sellador al agua (1L)', unit: 'un', qty: Math.ceil(m2 / 30), unitPrice: getCatPrice('pintura', 'fijador_1l', 'mat'), laborUnitPrice: 0, category: 'pintura' },
+      { name: 'Enduido plástico interior', unit: 'kg', qty: Math.ceil(m2 * 0.15), unitPrice: getCatPrice('pintura', 'enduido_kg', 'mat'), laborUnitPrice: 0, category: 'pintura' },
+      { name: 'Rodillo lana antigota 22cm', unit: 'un', qty: 1, unitPrice: getCatPrice('pintura', 'rodillo_22', 'mat'), laborUnitPrice: 0, category: 'pintura' },
+      { name: 'Cinta enmascarar pintor 48mm', unit: 'un', qty: 2, unitPrice: getCatPrice('pintura', 'cinta_enmascarar', 'mat'), laborUnitPrice: 0, category: 'pintura' },
+      { name: 'Lija al agua grano medio', unit: 'pliego', qty: 5, unitPrice: getCatPrice('pintura', 'lija_pliego', 'mat'), laborUnitPrice: 0, category: 'pintura' },
+      { name: 'Mano de obra pintura interior a 2 manos', unit: 'm²', qty: m2, unitPrice: 0, laborUnitPrice: Math.round(getCatPrice('pintura', 'latex_int_20', 'mo') * 0.4), category: 'pintura' }
+    ];
+  } else if (lower.includes('baño') || lower.includes('plomer') || lower.includes('agua') || lower.includes('inodoro') || lower.includes('caño') || lower.includes('termofusion') || lower.includes('griferia')) {
+    category = 'plomeria';
+    explanation = `He preparado el desglose para la **instalación sanitaria de un baño completo**. Contempla distribución de agua fría/caliente en termofusión, desagües primarios/secundarios en PVC sanitario, llaves de paso esféricas, kit de loza y mano de obra de plomería integral.`;
+    items = [
+      { name: 'Tubo termofusión Ø20mm x 4m', unit: 'barra', qty: 4, unitPrice: getCatPrice('plomeria', 'tubo_termo_20', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Tubo termofusión Ø25mm x 4m', unit: 'barra', qty: 2, unitPrice: getCatPrice('plomeria', 'tubo_termo_25', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Codos 90° termofusión Ø20mm', unit: 'un', qty: 10, unitPrice: getCatPrice('plomeria', 'codo_termo_20', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Caño PVC sanitario Ø110 x 4m', unit: 'barra', qty: 2, unitPrice: getCatPrice('plomeria', 'cano_pvc_110', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Caño PVC sanitario Ø40 x 4m', unit: 'barra', qty: 3, unitPrice: getCatPrice('plomeria', 'cano_pvc_40', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Pileta de patio con rejilla', unit: 'un', qty: 1, unitPrice: getCatPrice('plomeria', 'pileta_patio', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Llave de paso esférica con campana', unit: 'un', qty: 2, unitPrice: getCatPrice('plomeria', 'llave_paso_20', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Kit inodoro con mochila y bidet', unit: 'kit', qty: 1, unitPrice: getCatPrice('plomeria', 'kit_inodoro', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Mano de obra instalación sanitaria integral', unit: 'gl', qty: 1, unitPrice: 0, laborUnitPrice: Math.round(getCatPrice('plomeria', 'kit_inodoro', 'mo') * 2.5), category: 'plomeria' }
+    ];
+  } else {
+    const qty = qtyNum > 0 ? qtyNum : 1;
+    explanation = `He interpretado tu requerimiento y generado una partida técnica estimada para **"${escapeHtml(prompt)}"**. Puedes ajustar sus precios o cantidades en cualquier momento.`;
+    items = [
+      { name: prompt.length > 50 ? prompt.substring(0, 48) + '...' : prompt, unit: qtyNum > 0 ? 'un' : 'gl', qty: qty, unitPrice: Math.round(cInfo.mult * 8000), laborUnitPrice: Math.round(cInfo.mult * 6000), category: 'libre' }
+    ];
+  }
+
+  return { text: explanation, items };
+}
+
+function getCatPrice(category, itemId, type) {
+  const cat = CATEGORIES_CATALOG[category];
+  if (!cat) return 1000;
+  for (const grp of cat.groups) {
+    const it = grp.items.find(i => i.id === itemId);
+    if (it) {
+      const prices = it.prices[S.country] || it.prices.ar;
+      return type === 'mat' ? prices.mat : prices.mo;
+    }
+  }
+  return 1500;
+}
+
+function localFallbackItems(prompt) {
+  const cInfo = COUNTRIES[S.country] || COUNTRIES.ar;
+  return [
+    { name: prompt.length > 40 ? prompt.substring(0, 38) + '...' : prompt, unit: 'gl', qty: 1, unitPrice: Math.round(cInfo.mult * 9000), laborUnitPrice: Math.round(cInfo.mult * 7000), category: 'libre' }
+  ];
+}
+
+/* ─── INSERT AI ITEMS DIRECTLY INTO BUDGET (STEP 2) ──────── */
+function addAiItemsToBudget(msgIndex) {
+  const msg = S.aiMessages[msgIndex];
+  if (!msg || !msg.items || msg.items.length === 0) return;
+
+  const count = msg.items.length;
+  msg.items.forEach(it => {
+    S.items.push({
+      _id: Date.now() + Math.random(),
+      desc: it.name,
+      cant: it.qty || 1,
+      un: it.unit || 'un',
+      puMat: it.unitPrice || 0,
+      puMo: it.laborUnitPrice || 0,
+      subMat: 0,
+      subMo: 0,
+      total: 0
+    });
+  });
+
+  recalc();
+  saveActiveDraft();
+
+  // Switch to step 2 so user sees their new items
+  S.paso = 2;
+  S.aiChatOpen = false;
+  render();
+
+  alert('🎉 ¡Se han cargado con éxito ' + count + ' partidas generadas por la IA a tu presupuesto!');
+
+  // Smooth scroll to items table
+  setTimeout(() => {
+    const el = document.getElementById('items-container') || document.querySelector('.table-wrap');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 150);
+}
+
 render();
 </script>
 </body>
