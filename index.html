@@ -579,6 +579,17 @@
     }
 
   </style>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PresupuestAPP" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
 </head>
 <body>
 <div id="app"></div>
@@ -1272,6 +1283,7 @@ function html() {
     </div>
 
     <!-- FLOATING AI ASSISTANT BUTTON -->
+    ${pwaInstallButton()}
     ${aiFloatingButton()}
 
     <!-- AI ASSISTANT CHAT WINDOW -->
@@ -3365,6 +3377,18 @@ function newBudget() {
 
 let aiSpeechInstance = null;
 
+
+function pwaInstallButton() {
+  if (!window.__pwaInstallEvent) return '';
+  return `
+    <button id="pwa-install-btn"
+      onclick="window.__pwaInstallEvent.prompt(); window.__pwaInstallEvent.userChoice.then(()=>{ window.__pwaInstallEvent=null; render(); });"
+      style="position:fixed;bottom:88px;right:20px;z-index:9998;background:linear-gradient(135deg,#f59e0b,#d97706);color:#0f172a;border:none;border-radius:50px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 20px rgba(245,158,11,0.5);display:flex;align-items:center;gap:6px;animation:fadeInUp .3s ease;"
+      title="Instalar PresupuestAPP en tu dispositivo">
+      📲 Instalar App
+    </button>
+  `;
+}
 function aiFloatingButton() {
   if (S.aiChatOpen) return '';
   return `
@@ -3948,6 +3972,32 @@ function addAiItemsToBudget(msgIndex) {
 }
 
 render();
+</script>
+
+<script>
+// PWA — Service Worker Registration + Install Prompt
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/presupuestAPP/service-worker.js')
+      .then(reg => console.log('[PWA] SW registered:', reg.scope))
+      .catch(err => console.warn('[PWA] SW registration failed:', err));
+  });
+}
+
+// Captura evento beforeinstallprompt para botón de instalación
+window.__pwaInstallEvent = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  window.__pwaInstallEvent = e;
+  // Re-render para mostrar botón instalar
+  if (typeof render === 'function') render();
+});
+
+window.addEventListener('appinstalled', () => {
+  window.__pwaInstallEvent = null;
+  if (typeof render === 'function') render();
+  console.log('[PWA] App instalada correctamente!');
+});
 </script>
 </body>
 </html>
