@@ -2,7 +2,7 @@
 <html lang="es" data-theme="light">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>PresupuestAPP — SaaS Obras & Servicios B2B</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -578,13 +578,72 @@
       30% { transform: translateY(-5px); }
     }
 
+  
+    
+    /* ══ PWA & MOBILE SAFE-AREA PERFECTION ═════════════════════ */
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+      --sal: env(safe-area-inset-left, 0px);
+      --sar: env(safe-area-inset-right, 0px);
+    }
+
+    /* Topbar padding: safe from notification bar/notch */
+    .topbar {
+      padding-top: max(10px, calc(6px + var(--sat))) !important;
+      padding-left: max(16px, calc(10px + var(--sal))) !important;
+      padding-right: max(16px, calc(10px + var(--sar))) !important;
+    }
+
+    @media (max-width: 768px) {
+      .topbar {
+        padding-top: max(12px, calc(8px + var(--sat))) !important;
+        padding-bottom: 10px !important;
+        padding-left: max(12px, calc(6px + var(--sal))) !important;
+        padding-right: max(12px, calc(6px + var(--sar))) !important;
+      }
+      .content {
+        padding-bottom: calc(115px + var(--sab)) !important;
+      }
+      .modal-sheet {
+        padding-bottom: calc(24px + var(--sab)) !important;
+      }
+    }
+
+    /* AI Chat Window responsive position and dimensions */
+    .ai-chat-window {
+      position: fixed !important;
+      bottom: max(20px, calc(16px + var(--sab))) !important;
+      right: max(20px, calc(16px + var(--sar))) !important;
+      width: 430px !important;
+      max-width: calc(100vw - 32px) !important;
+      height: 620px !important;
+      max-height: calc(100vh - 44px - var(--sat) - var(--sab)) !important;
+      max-height: calc(100dvh - 44px - var(--sat) - var(--sab)) !important;
+      z-index: 9999 !important;
+    }
+
+    @media (max-width: 640px) {
+      .ai-chat-window {
+        bottom: max(10px, calc(6px + var(--sab))) !important;
+        left: max(8px, var(--sal)) !important;
+        right: max(8px, var(--sar)) !important;
+        width: auto !important;
+        max-width: none !important;
+        height: calc(100vh - 20px - var(--sat) - var(--sab)) !important;
+        height: calc(100dvh - 20px - var(--sat) - var(--sab)) !important;
+        max-height: calc(100vh - 20px - var(--sat) - var(--sab)) !important;
+        max-height: calc(100dvh - 20px - var(--sat) - var(--sab)) !important;
+        border-radius: 20px !important;
+      }
+    }
   </style>
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="PresupuestAPP" />
   <meta name="theme-color" content="#0f172a" />
   <link rel="apple-touch-icon" href="icon-192.png" />
@@ -1531,9 +1590,43 @@ function mobHeader(inSimulator = false) {
         <button onclick="toggleLang()" class="btn-pill" style="padding:4px 7px;font-size:11px;font-weight:800;" title="ES / EN">
           ${S.lang.toUpperCase()}
         </button>
-        <button onclick="openCountryModal()" class="btn-pill" style="padding:4px 7px;font-size:11px;">
+        <button onclick="openCountryModal()" class="btn-pill" style="padding:4px 7px;font-size:11px;" title="País">
           ${cInfo.flag}
         </button>
+
+        <div style="position:relative;">
+          ${S.user ? `
+            <button onclick="toggleUserMenu(event)" class="btn-pill" style="padding:3px 7px;font-size:11px;display:flex;align-items:center;gap:4px;" title="Mi cuenta">
+              <div style="width:20px;height:20px;border-radius:50%;background:${S.isPro ? 'var(--pro)' : 'var(--accent)'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;">
+                ${(S.user.name || S.user.email || 'U')[0].toUpperCase()}
+              </div>
+              <span style="font-size:11px;font-weight:700;">${esc(S.user.name.split(' ')[0])}</span>
+              ${ic('chevron-down', 10)}
+            </button>
+            ${S.userMenuOpen ? `
+              <div class="user-menu-dropdown" style="right:0;top:calc(100% + 6px);width:220px;z-index:9999;">
+                <div style="padding:8px 10px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+                  <div style="font-weight:800;font-size:12px;color:var(--text);">${esc(S.user.name)}</div>
+                  <div style="font-size:10px;color:var(--text3);">${esc(S.user.email)}</div>
+                  <div style="margin-top:4px;"><span class="chip ${S.isPro ? 'chip-pro' : ''}">Plan ${S.isPro ? 'B2B PRO' : 'Gratuito'}</span></div>
+                </div>
+                <button onclick="openBrandModal(); S.userMenuOpen=false; render();" class="user-menu-item">
+                  ${ic('palette', 13)} <span>Configurar Membrete</span>
+                </button>
+                <button onclick="openPricesModal(); S.userMenuOpen=false; render();" class="user-menu-item">
+                  ${ic('sliders', 13)} <span>Matriz de Precios</span>
+                </button>
+                <button onclick="handleLogout()" class="user-menu-item" style="color:var(--danger);">
+                  ${ic('log-out', 13)} <span>Cerrar Sesión</span>
+                </button>
+              </div>
+            ` : ''}
+          ` : `
+            <button onclick="openAuthModal('login')" class="btn btn-primary" style="padding:4px 9px;font-size:11px;font-weight:700;border-radius:14px;display:flex;align-items:center;gap:4px;" title="Iniciar sesión">
+              ${ic('log-in', 12)} <span>${t('login') || 'Entrar'}</span>
+            </button>
+          `}
+        </div>
       </div>
     </div>
   `;
@@ -3383,7 +3476,7 @@ function pwaInstallButton() {
   return `
     <button id="pwa-install-btn"
       onclick="window.__pwaInstallEvent.prompt(); window.__pwaInstallEvent.userChoice.then(()=>{ window.__pwaInstallEvent=null; render(); });"
-      style="position:fixed;bottom:88px;right:20px;z-index:9998;background:linear-gradient(135deg,#f59e0b,#d97706);color:#0f172a;border:none;border-radius:50px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 20px rgba(245,158,11,0.5);display:flex;align-items:center;gap:6px;animation:fadeInUp .3s ease;"
+      style="position:fixed;bottom:max(84px, calc(74px + env(safe-area-inset-bottom, 0px)));right:max(16px, calc(14px + env(safe-area-inset-right, 0px)));z-index:9998;background:linear-gradient(135deg,#f59e0b,#d97706);color:#0f172a;border:none;border-radius:50px;padding:10px 18px;font-weight:700;font-size:13px;cursor:pointer;box-shadow:0 4px 20px rgba(245,158,11,0.5);display:flex;align-items:center;gap:6px;animation:fadeInUp .3s ease;"
       title="Instalar PresupuestAPP en tu dispositivo">
       📲 Instalar App
     </button>
@@ -3392,7 +3485,7 @@ function pwaInstallButton() {
 function aiFloatingButton() {
   if (S.aiChatOpen) return '';
   return `
-    <div class="fixed bottom-6 right-6 z-[990] flex items-center">
+    <div class="fixed z-[990] flex items-center" style="bottom:max(20px, calc(14px + env(safe-area-inset-bottom, 0px))); right:max(16px, calc(14px + env(safe-area-inset-right, 0px)));">
       <button onclick="toggleAiChat()" class="ai-fab-btn flex items-center gap-2.5 px-4 py-3 text-white rounded-full font-semibold text-xs sm:text-sm tracking-wide">
         <span class="relative flex h-2.5 w-2.5">
           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-300 opacity-80"></span>
@@ -3455,7 +3548,7 @@ function aiChatModal() {
   const cInfo = COUNTRIES[S.country] || COUNTRIES.ar;
 
   return `
-    <div onclick="event.stopPropagation()" class="ai-chat-window fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-[430px] max-w-[calc(100vw-24px)] h-[620px] max-h-[calc(100vh-32px)] flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden animate-in slide-in-from-bottom-5 duration-200">
+    <div onclick="event.stopPropagation()" class="ai-chat-window fixed flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden animate-in slide-in-from-bottom-5 duration-200">
       
       <!-- HEADER -->
       <div class="px-4 py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white flex items-center justify-between shrink-0 shadow-sm">
