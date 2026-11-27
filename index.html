@@ -1306,6 +1306,16 @@ const initialUser = getInitialUser();
 const storedDraft = getStoredDraft();
 
 const S = {
+  incluirMO: true, // Interruptor global: true = incluye mano de obra, false = solo materiales
+  montoMOGlobal: 0, // Monto global de mano de obra
+  moModo: 'global', // 'global' | 'rubros'
+  moRubros: {
+    electricidad: 0,
+    paredes: 0,
+    plomeria: 0,
+    pintura: 0
+  },
+  moConcepto: 'Mano de obra integral de obra e instalaciones',
   preciosRefFecha: '2026-11-27',
   preciosMoneda: 'ARS',
   preciosLoading: false,
@@ -1394,50 +1404,176 @@ function calcItem(catId, qty, opts = {}) {
   return null;
 }
 
+
+/* ═══════════════════════════════════════════════════════════
+   MANO DE OBRA GLOBAL & POR CONJUNTO CONTROLLERS
+═══════════════════════════════════════════════════════════ */
+function toggleIncluirMO() {
+  S.incluirMO = !S.incluirMO;
+  recalc();
+  saveActiveDraft();
+  render();
+}
+
+function setMOModo(modo) {
+  S.moModo = modo;
+  recalc();
+  saveActiveDraft();
+  render();
+}
+
+function setMontoMOGlobal(val) {
+  S.montoMOGlobal = Math.max(0, parseFloat(val) || 0);
+  recalc();
+  saveActiveDraft();
+}
+
+function setMORubro(rubroKey, val) {
+  if (!S.moRubros) S.moRubros = { electricidad: 0, paredes: 0, plomeria: 0, pintura: 0 };
+  S.moRubros[rubroKey] = Math.max(0, parseFloat(val) || 0);
+  recalc();
+  saveActiveDraft();
+}
+
+function manoDeObraCard() {
+  const cInfo = COUNTRIES[S.country] || COUNTRIES.ar;
+
+  return `
+    <div id="mo-config-card" class="card" style="padding:16px;margin-top:16px;border:1.5px solid ${S.incluirMO ? 'var(--accent)' : 'var(--border)'};transition:all var(--t) var(--spring);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:38px;height:38px;border-radius:10px;background:${S.incluirMO ? 'var(--accent-bg)' : 'var(--surface2)'};color:${S.incluirMO ? 'var(--accent)' : 'var(--text4)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            ${ic('hard-hat', 20)}
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:900;color:var(--text);display:flex;align-items:center;gap:8px;">
+              <span>Mano de Obra</span>
+              <span class="chip ${S.incluirMO ? 'chip-pro' : ''}" style="font-size:9.5px;padding:2px 7px;">
+                ${S.incluirMO ? '✓ INCLUIDA' : '✕ NO INCLUIDA (SOLO MATERIALES)'}
+              </span>
+            </div>
+            <div style="font-size:11.5px;color:var(--text3);margin-top:2px;">
+              ${S.incluirMO ? 'Cotizada por conjunto/ambiente o monto global de obra (sin costos individuales por tornillo)' : 'El presupuesto cotiza exclusivamente insumos y materiales'}
+            </div>
+          </div>
+        </div>
+
+        <!-- Interruptor visible (Toggle switch) -->
+        <button type="button" onclick="toggleIncluirMO()" class="btn ${S.incluirMO ? 'btn-primary' : 'btn-ghost'}" style="padding:7px 16px;font-size:12px;font-weight:800;border-radius:24px;">
+          ${S.incluirMO ? ic('toggle-right', 18) + ' Mano de Obra Activa' : ic('toggle-left', 18) + ' Activar Mano de Obra'}
+        </button>
+      </div>
+
+      ${S.incluirMO ? `
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);" class="fade-in">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+            <span style="font-size:12px;font-weight:700;color:var(--text);">Modalidad de mano de obra:</span>
+            <div style="display:flex;gap:6px;">
+              <button type="button" onclick="setMOModo('global')" class="sub-option-btn ${S.moModo === 'global' ? 'active' : ''}" style="padding:5px 12px;font-size:11.5px;border-radius:8px;">
+                💼 Monto Global
+              </button>
+              <button type="button" onclick="setMOModo('rubros')" class="sub-option-btn ${S.moModo === 'rubros' ? 'active' : ''}" style="padding:5px 12px;font-size:11.5px;border-radius:8px;">
+                🏗️ Por Rubro / Conjunto
+              </button>
+            </div>
+          </div>
+
+          ${S.moModo === 'global' ? `
+            <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:10px;">
+              <div>
+                <label style="font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:4px;">
+                  Monto Total Mano de Obra (${cInfo.symbol})
+                </label>
+                <input type="number" min="0" step="500" value="${S.montoMOGlobal || 0}" oninput="setMontoMOGlobal(this.value)" placeholder="Ej: 250000" style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid var(--border);background:var(--surface);font-size:13.5px;font-weight:800;color:var(--text);outline:none;" />
+              </div>
+              <div>
+                <label style="font-size:10px;font-weight:800;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:4px;">
+                  Concepto / Alcance del trabajo
+                </label>
+                <input type="text" value="${esc(S.moConcepto || '')}" oninput="S.moConcepto=this.value;saveActiveDraft();" placeholder="Ej: Mano de obra integral baño y cocina" style="width:100%;padding:9px 12px;border-radius:9px;border:1.5px solid var(--border);background:var(--surface);font-size:12px;color:var(--text);outline:none;" />
+              </div>
+            </div>
+          ` : `
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:8px;">
+              ${[
+                { id: 'electricidad', label: '⚡ Electricidad' },
+                { id: 'paredes', label: '🧱 Paredes / Albañil.' },
+                { id: 'plomeria', label: '💧 Sanitarios / Plom.' },
+                { id: 'pintura', label: '🎨 Pintura / Term.' }
+              ].map(r => `
+                <div style="padding:8px 10px;background:var(--surface2);border-radius:9px;">
+                  <div style="font-size:10.5px;font-weight:800;color:var(--text2);margin-bottom:4px;">${r.label}</div>
+                  <input type="number" min="0" step="500" value="${S.moRubros[r.id] || 0}" oninput="setMORubro('${r.id}', this.value)" placeholder="0" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);font-size:12px;font-weight:700;color:var(--text);outline:none;" />
+                </div>
+              `).join('')}
+            </div>
+          `}
+
+          <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--text3);background:var(--surface2);padding:8px 12px;border-radius:9px;">
+            <span>💡 ¿Dudas con la tarifa? Pídele al <b>Asistente IA</b> que estime la mano de obra del conjunto y aplícala con 1 clic.</span>
+            <button type="button" onclick="toggleAiChat();sendQuickAiPrompt('¿Cuánto estimas de mano de obra para los ítems cargados en el cómputo?');" class="btn-pill" style="padding:4px 10px;font-size:10.5px;background:var(--accent-bg);color:var(--accent);font-weight:800;border:none;">
+              ✨ Estimar con IA
+            </button>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
 function recalc() {
   const desp = S.cliente.desp || 0.10;
-  let totalMatBase = 0, totalMO = 0;
+  let totalMatBase = 0;
 
+  // 1. Cada material suma únicamente su valor neto de insumo (sin mano de obra individual pegada)
   S.items.forEach(i => {
     const pMat = i.unitMat || 0;
-    const pMO = i.unitMO || 0;
     const q = i.qty || 0;
     const baseM = q * pMat;
     i.matBase = baseM;
     i.merma = baseM * desp;
     i.subtMat = baseM + i.merma;
-    i.subtMO = q * pMO;
-    i.gan = 0.20 * (i.subtMat + i.subtMO);
-    i.total = i.subtMat + i.subtMO + i.gan;
+    i.subtMO = 0; // Mano de obra individual desactivada
+    i.total = i.subtMat; // En la tabla de materiales, cada fila muestra su costo de insumo
 
     totalMatBase += baseM;
-    totalMO += i.subtMO;
   });
 
-  // 1. Opción Estándar (Recomendada):
-  // Materiales de catálogo homologados, merma según % elegido, MO de referencia, margen formal 20%
+  // 2. Cálculo de Mano de Obra (Global o por Rubro)
+  let totalMO = 0;
+  if (S.incluirMO) {
+    if (S.moModo === 'rubros' && S.moRubros) {
+      totalMO = (parseFloat(S.moRubros.electricidad) || 0) +
+                (parseFloat(S.moRubros.paredes) || 0) +
+                (parseFloat(S.moRubros.plomeria) || 0) +
+                (parseFloat(S.moRubros.pintura) || 0);
+    } else {
+      totalMO = parseFloat(S.montoMOGlobal) || 0;
+    }
+  }
+
+  // 3. Opciones de Presupuesto
+  // Opción Estándar (Recomendada):
   const matBaseStd = totalMatBase;
   const mermaStd = matBaseStd * desp;
   const matStd = matBaseStd + mermaStd;
-  const moStd = totalMO;
+  const moStd = S.incluirMO ? totalMO : 0;
   const ganStd = 0.20 * (matStd + moStd);
   const totalStandard = matStd + moStd + ganStd;
 
-  // 2. Opción Económica (Ahorro):
-  // Materiales estándar optimizados (-10%), merma según % elegido, MO base, margen accesible 12%
+  // Opción Económica: Materiales -10%, MO base (si está activa), margen 12%
   const matBaseEcon = totalMatBase * 0.90;
   const mermaEcon = matBaseEcon * desp;
   const matEcon = matBaseEcon + mermaEcon;
-  const moEcon = totalMO;
+  const moEcon = S.incluirMO ? totalMO : 0;
   const ganEcon = 0.12 * (matEcon + moEcon);
   const totalEcon = matEcon + moEcon + ganEcon;
 
-  // 3. Opción Premium (Alta Gama):
-  // Materiales de 1ª línea (+30%), merma según % elegido, MO certificada (+15%), margen 22%
+  // Opción Premium: Materiales 1ª línea (+30%), MO certificada (+15%), margen 22%
   const matBasePremium = totalMatBase * 1.30;
   const mermaPremium = matBasePremium * desp;
   const matPremium = matBasePremium + mermaPremium;
-  const moPremium = totalMO * 1.15;
+  const moPremium = S.incluirMO ? Math.round(totalMO * 1.15) : 0;
   const ganPremium = 0.22 * (matPremium + moPremium);
   const totalPremium = matPremium + moPremium + ganPremium;
 
@@ -1455,6 +1591,8 @@ function recalc() {
       despPct: Math.round(desp * 100),
       mat: matStd,
       mo: moStd,
+      incluirMO: S.incluirMO,
+      moConcepto: S.moConcepto,
       margenPct: 20,
       gan: ganStd,
       total: totalStandard,
@@ -1471,6 +1609,8 @@ function recalc() {
       despPct: Math.round(desp * 100),
       mat: matEcon,
       mo: moEcon,
+      incluirMO: S.incluirMO,
+      moConcepto: S.moConcepto,
       margenPct: 12,
       gan: ganEcon,
       total: totalEcon,
@@ -1487,6 +1627,8 @@ function recalc() {
       despPct: Math.round(desp * 100),
       mat: matPremium,
       mo: moPremium,
+      incluirMO: S.incluirMO,
+      moConcepto: S.moConcepto,
       margenPct: 22,
       gan: ganPremium,
       total: totalPremium,
@@ -2025,6 +2167,8 @@ function paso2() {
         `}
       </div>
 
+      ${manoDeObraCard()}
+
       <!-- Preview Summary in Step 2 -->
       ${S.items.length > 0 ? `
         <div class="card" style="padding:14px;margin-top:16px;">
@@ -2269,25 +2413,37 @@ function paso3() {
         </div>
 
         <div style="background:var(--surface2);border-radius:12px;padding:12px 14px;margin:14px 0;font-size:12px;">
-          <div style="font-size:11px;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:5px;">
-            Desglose Transparente de Costos
+          <div style="font-size:11px;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:5px;display:flex;justify-content:space-between;align-items:center;">
+            <span>Desglose Transparente de Costos</span>
+            <span class="chip" style="font-size:9.5px;padding:1px 6px;">
+              ${chosen.incluirMO && chosen.mo > 0 ? 'Materiales + Mano de Obra' : 'Solo Materiales'}
+            </span>
           </div>
+
           <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
             <span style="color:var(--text2);">${t('mat_insumos')} (Cómputo neto):</span>
             <span style="color:var(--text);font-weight:700;">${curFmt(chosen.matBase)}</span>
           </div>
+
           <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
             <span style="color:var(--text2);">+ Merma técnica de obra (${chosen.despPct}%):</span>
             <span style="color:var(--text);font-weight:700;">${curFmt(chosen.merma)}</span>
           </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
-            <span style="color:var(--text2);">+ ${t('mo_especializada')}:</span>
-            <span style="color:var(--text);font-weight:700;">${curFmt(chosen.mo)}</span>
-          </div>
+
+          ${chosen.incluirMO && chosen.mo > 0 ? `
+            <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+              <span style="color:var(--text2);">
+                + ${t('mo_especializada')} (${chosen.moConcepto || 'Global / Conjunto'}):
+              </span>
+              <span style="color:var(--text);font-weight:700;">${curFmt(chosen.mo)}</span>
+            </div>
+          ` : ''}
+
           <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
             <span style="color:var(--text2);">+ Margen operativo, herramental y beneficio (${chosen.margenPct}%):</span>
             <span style="color:var(--text);font-weight:700;">${curFmt(chosen.gan)}</span>
           </div>
+
           <div style="display:flex;justify-content:space-between;padding-top:6px;border-top:1px solid var(--border);">
             <span style="color:var(--text3);">${t('garantia_formal')}:</span>
             <span style="color:${activeColor};font-weight:800;">${chosen.warranty} ✓</span>
@@ -2297,7 +2453,11 @@ function paso3() {
         <div style="display:flex;justify-content:space-between;align-items:baseline;padding-top:10px;border-top:2px solid var(--text);">
           <div>
             <span style="font-size:14px;font-weight:900;color:var(--text);">${t('total_presupuesto')}</span>
-            <div style="font-size:10px;color:var(--text3);">Suma exacta: Materiales + Merma + Mano de Obra + Margen</div>
+            <div style="font-size:10.5px;color:var(--text3);">
+              ${chosen.incluirMO && chosen.mo > 0
+                ? 'Suma exacta: Materiales + Merma + Mano de Obra + Margen'
+                : 'Suma exacta: Materiales + Merma + Margen operativo'}
+            </div>
           </div>
           <span style="font-size:24px;font-weight:900;color:${activeColor};">${curFmt(chosen.total)}</span>
         </div>
@@ -2508,7 +2668,7 @@ function catalogModal() {
                             ${hasQty ? `<span style="color:var(--accent);">${ic('check-circle-2', 13)}</span>` : ''}
                           </div>
                           <div style="font-size:11px;color:var(--text3);margin-top:2px;">
-                            <span>${curFmt(p.mat)} ${t('unit_cost_label')} · ${curFmt(p.mo)} m.o. / ${item.unit}</span>
+                            <span>${curFmt(p.mat)} / ${item.unit}</span>
                           </div>
                         </div>
 
@@ -3954,7 +4114,6 @@ function renderAiChatMessage(msg, idx, cInfo) {
     `;
   }
 
-  // Assistant message
   const formattedText = formatAiMarkdown(msg.text);
 
   return `
@@ -3967,12 +4126,30 @@ function renderAiChatMessage(msg, idx, cInfo) {
           ${formattedText}
         </div>
 
+        <!-- ESTIMACIÓN DE MANO DE OBRA POR CONJUNTO / AMBIENTE -->
+        ${msg.laborEstimate ? `
+          <div class="ai-takeoff-card p-3 shadow-md border-amber-300 dark:border-amber-700/60 bg-amber-50/50 dark:bg-amber-950/20">
+            <div class="flex items-center justify-between pb-2 border-b border-amber-200/60 dark:border-amber-800/40 mb-2">
+              <span class="font-bold text-[11px] text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                ${ic('hard-hat', 13)} Mano de Obra por Conjunto / Ambiente
+              </span>
+              <span class="text-xs text-amber-900 dark:text-amber-200 font-black">${cInfo.sym} ${safeFormatNum(msg.laborEstimate.amount)}</span>
+            </div>
+            <div class="text-[11px] text-slate-700 dark:text-slate-300 mb-2.5 leading-relaxed">
+              Alcance: <b>${escapeHtml(msg.laborEstimate.scope || 'Trabajo completo')}</b>
+            </div>
+            <button onclick="applyAiLaborToBudget(${idx})" class="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition">
+              ${ic('check-circle', 14)} Aplicar esta Mano de Obra al Presupuesto (${cInfo.sym} ${safeFormatNum(msg.laborEstimate.amount)})
+            </button>
+          </div>
+        ` : ''}
+
         <!-- SUGGESTED BUDGET ITEMS CARD -->
         ${msg.items && msg.items.length > 0 ? `
           <div class="ai-takeoff-card p-3 shadow-md border-purple-200 dark:border-purple-900/50">
             <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800 mb-2">
               <span class="font-bold text-[11px] text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
-                ${ic('calculator', 13)} Desglose de Partidas (${msg.items.length})
+                ${ic('calculator', 13)} Partidas de Materiales (${msg.items.length})
               </span>
               <span class="text-[10px] text-slate-500 font-semibold">${cInfo.sym} ${safeFormatNum(calcAiItemsTotal(msg.items))}</span>
             </div>
@@ -3985,14 +4162,14 @@ function renderAiChatMessage(msg, idx, cInfo) {
                     <span class="text-[10px] text-slate-400 block">${it.qty} ${it.unit}</span>
                   </div>
                   <div class="text-right shrink-0">
-                    <span class="font-bold text-slate-700 dark:text-slate-300">${cInfo.sym} ${safeFormatNum((it.unitPrice + it.laborUnitPrice) * it.qty)}</span>
+                    <span class="font-bold text-slate-700 dark:text-slate-300">${cInfo.sym} ${safeFormatNum((it.unitPrice || 0) * (it.qty || 1))}</span>
                   </div>
                 </div>
               `).join('')}
             </div>
 
-            <button onclick="addAiItemsToBudget(${idx})" class="w-full mt-3 py-2 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-lg shadow-sm hover:shadow transition flex items-center justify-center gap-2 text-xs">
-              ${ic('plus-circle', 15)} <span>Cargar estas partidas al presupuesto</span>
+            <button onclick="addAiItemsToBudget(${idx})" class="mt-2.5 w-full py-2 px-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:opacity-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition">
+              ${ic('plus-circle', 14)} Cargar estas partidas de materiales
             </button>
           </div>
         ` : ''}
@@ -4000,6 +4177,30 @@ function renderAiChatMessage(msg, idx, cInfo) {
     </div>
   `;
 }
+
+function applyAiLaborToBudget(msgIndex) {
+  const msg = S.aiMessages[msgIndex];
+  if (!msg || !msg.laborEstimate) return;
+
+  S.incluirMO = true; // Activa el interruptor de mano de obra
+  S.moModo = 'global';
+  S.montoMOGlobal = parseFloat(msg.laborEstimate.amount) || 0;
+  if (msg.laborEstimate.scope) S.moConcepto = msg.laborEstimate.scope;
+
+  recalc();
+  saveActiveDraft();
+
+  S.paso = 2;
+  render();
+
+  alert('👷 ¡Mano de obra aplicada con éxito al presupuesto! (' + curFmt(S.montoMOGlobal) + ')');
+
+  setTimeout(() => {
+    const el = document.getElementById('mo-config-card') || document.querySelector('.card');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 150);
+}
+
 
 function formatAiMarkdown(text) {
   if (!text) return '';
@@ -4201,90 +4402,118 @@ async function callGeminiApi(prompt) {
 
 /* ─── MOTOR LOCAL INTELIGENTE (OFFLINE / SIN API KEY) ────── */
 async function localAiParser(prompt) {
-  // Simulate natural brief AI calculation latency
-  await new Promise(r => setTimeout(r, 600));
-
   const lower = prompt.toLowerCase();
   const cInfo = COUNTRIES[S.country] || COUNTRIES.ar;
 
-  // Extract quantity numbers
+  // Extraer números de cantidad o medidas (ej: 4x4, 15m2, 8 bocas)
+  const roomMatch = lower.match(/(\d+(?:[.,]\d+)?)\s*[xX*]\s*(\d+(?:[.,]\d+)?)/);
   const numMatch = lower.match(/(\d+(?:[.,]\d+)?)/);
   const qtyNum = numMatch ? parseFloat(numMatch[1].replace(',', '.')) : 0;
 
   let category = 'libre';
   let explanation = '';
   let items = [];
+  let laborEstimate = null;
 
   if (lower.includes('luz') || lower.includes('boca') || lower.includes('electr') || lower.includes('enchufe') || lower.includes('toma') || lower.includes('termica') || lower.includes('cable')) {
     category = 'electricidad';
-    const bocas = qtyNum > 0 ? qtyNum : 6;
-    explanation = `He preparado el cómputo para **${bocas} bocas de instalación eléctrica** completa. Incluye cajas embutidas, cañerías corrugadas, cableado reglamentario normalizado de 2.5mm² para tomas y 1.5mm² para iluminación, tablero de protección con interruptor termomagnético bipolar y mano de obra por boca.`;
+    const bocas = qtyNum > 0 ? qtyNum : 8;
+    const moTotalBocas = Math.round(bocas * 18000);
+    explanation = `He preparado el cómputo de materiales para **${bocas} bocas eléctricas** con cañería, cajas y cableado. La mano de obra se calcula como un conjunto integral (${cInfo.sym} ${safeFormatNum(moTotalBocas)}) para el trabajo completo con conexionado de tablero y pruebas reglamentarias.`;
     items = [
-      { name: 'Caja rectangular 5x10 embutir', unit: 'un', qty: bocas, unitPrice: getCatPrice('electricidad', 'caja_rect', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
-      { name: 'Caja octogonal de techo', unit: 'un', qty: Math.ceil(bocas * 0.5), unitPrice: getCatPrice('electricidad', 'caja_octo', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
-      { name: 'Caño corrugado ignífugo 3/4"', unit: 'm', qty: Math.round(bocas * 5), unitPrice: getCatPrice('electricidad', 'cano_corr', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
-      { name: 'Cable unipolar 2.5mm² (Tomas)', unit: 'm', qty: Math.round(bocas * 12), unitPrice: getCatPrice('electricidad', 'cable_25', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
-      { name: 'Cable unipolar 1.5mm² (Luces)', unit: 'm', qty: Math.round(bocas * 8), unitPrice: getCatPrice('electricidad', 'cable_15', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
-      { name: 'Toma corriente 10A / Punto', unit: 'un', qty: bocas, unitPrice: getCatPrice('electricidad', 'modulo_10a', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
-      { name: 'Tablero 4-8 bocas + Térmica bipolar', unit: 'kit', qty: 1, unitPrice: getCatPrice('electricidad', 'tablero_prin', 'mat') + getCatPrice('electricidad', 'termica_bip', 'mat'), laborUnitPrice: 0, category: 'electricidad' },
-      { name: 'Mano de obra instalación eléctrica por boca', unit: 'boca', qty: bocas, unitPrice: 0, laborUnitPrice: Math.round(getCatPrice('electricidad', 'modulo_10a', 'mo') * 2.5), category: 'electricidad' }
+      { name: 'Caja rectangular 5x10 embutir', unit: 'u', qty: bocas, unitPrice: getCatPrice('electricidad', 'elec_caja_rect', 'mat') || 550, laborUnitPrice: 0, category: 'electricidad' },
+      { name: 'Caja octogonal de techo', unit: 'u', qty: Math.ceil(bocas * 0.5), unitPrice: getCatPrice('electricidad', 'elec_caja_oct', 'mat') || 600, laborUnitPrice: 0, category: 'electricidad' },
+      { name: 'Caño corrugado ignífugo 3/4" (m)', unit: 'm', qty: Math.round(bocas * 5), unitPrice: getCatPrice('electricidad', 'elec_cano_corr', 'mat') || 750, laborUnitPrice: 0, category: 'electricidad' },
+      { name: 'Cable unipolar 2.5mm² (Tomas) (m)', unit: 'm', qty: Math.round(bocas * 12), unitPrice: getCatPrice('electricidad', 'elec_cable_25', 'mat') || 1050, laborUnitPrice: 0, category: 'electricidad' },
+      { name: 'Cable unipolar 1.5mm² (Luces) (m)', unit: 'm', qty: Math.round(bocas * 8), unitPrice: getCatPrice('electricidad', 'elec_cable_15', 'mat') || 650, laborUnitPrice: 0, category: 'electricidad' },
+      { name: 'Módulo toma corriente 10A / Punto', unit: 'u', qty: bocas, unitPrice: getCatPrice('electricidad', 'elec_mod_10a', 'mat') || 2100, laborUnitPrice: 0, category: 'electricidad' },
+      { name: 'Tablero principal + Térmica bipolar', unit: 'u', qty: 1, unitPrice: 26000, laborUnitPrice: 0, category: 'electricidad' }
     ];
-  } else if (lower.includes('drywall') || lower.includes('durlock') || lower.includes('placa') || lower.includes('tabique') || lower.includes('pared') || lower.includes('yeso')) {
+    laborEstimate = {
+      amount: moTotalBocas,
+      scope: `Instalación eléctrica completa de ${bocas} bocas, cañerías, cableado y armado de tablero`
+    };
+  } else if (lower.includes('baño') || lower.includes('sanitar') || lower.includes('inodoro') || lower.includes('bidet') || lower.includes('griferia') || lower.includes('plomer')) {
+    category = 'plomeria';
+    const moTotalBano = 320000;
+    explanation = `He preparado el listado de materiales para **instalación sanitaria completa de baño**. La mano de obra se cotiza como un conjunto completo (${cInfo.sym} ${safeFormatNum(moTotalBano)}) que abarca tendido de agua fría y caliente por termofusión, desagües cloacales con junta O-Ring, ventilación y fijación de artefactos.`;
+    items = [
+      { name: 'Caño termofusión agua fría/caliente 20mm (m)', unit: 'm', qty: 12, unitPrice: getCatPrice('plomeria', 'san_termo_20', 'mat') || 1850, laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Caño termofusión 25mm (m)', unit: 'm', qty: 6, unitPrice: getCatPrice('plomeria', 'san_termo_25', 'mat') || 2600, laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Codos 90° y cuplas termofusión (kit)', unit: 'u', qty: 16, unitPrice: 1000, laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Llave de paso esférica con campana', unit: 'u', qty: 2, unitPrice: getCatPrice('plomeria', 'san_llave_paso', 'mat') || 12500, laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Caño desagüe cloacal 110mm (m)', unit: 'm', qty: 4, unitPrice: getCatPrice('plomeria', 'san_desague_110', 'mat') || 8200, laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Caño desagüe 40mm (m)', unit: 'm', qty: 6, unitPrice: getCatPrice('plomeria', 'san_desague_40', 'mat') || 2800, laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Pileta de patio sifonada con rejilla inox', unit: 'u', qty: 1, unitPrice: getCatPrice('plomeria', 'san_pileta_patio', 'mat') || 9500, laborUnitPrice: 0, category: 'plomeria' },
+      { name: 'Kit instalación inodoro y bidet', unit: 'u', qty: 1, unitPrice: getCatPrice('plomeria', 'san_kit_inodoro', 'mat') || 14500, laborUnitPrice: 0, category: 'plomeria' }
+    ];
+    laborEstimate = {
+      amount: moTotalBano,
+      scope: 'Mano de obra completa instalación sanitaria y desagües de baño'
+    };
+  } else if (lower.includes('drywall') || lower.includes('durlock') || lower.includes('placa') || lower.includes('tabique') || lower.includes('yeso')) {
     category = 'paredes';
     const m2 = qtyNum > 0 ? qtyNum : 15;
     const placas = Math.ceil((m2 / 2.88) * 1.10);
     const montantes = Math.ceil(m2 * 0.85);
     const soleras = Math.ceil(m2 * 0.45);
-    const masilla = Math.ceil(m2 * 1.5);
-    explanation = `He calculado el despiece técnico para **${m2} m² de tabique en sistema Drywall** (emplacado estándar). Contempla estructura de chapa galvanizada con montantes cada 40cm, soleras perimetrales, fijaciones T1/T2, cinta de papel microperforada, masilla de juntas, lana de vidrio acústica y mano de obra de armado.`;
+    const moTotalDrywall = Math.round(m2 * 12500);
+    explanation = `Cálculo técnico para **${m2} m² de tabique en sistema Drywall**. Los materiales se detallan como insumos netos. La mano de obra se presupuesta por el conjunto terminado (${cInfo.sym} ${safeFormatNum(moTotalDrywall)}) incluyendo replanteo, armado de estructura y tomado de juntas con masilla.`;
     items = [
-      { name: 'Placa yeso estándar 12.5mm', unit: 'un', qty: placas, unitPrice: getCatPrice('paredes', 'placa_std', 'mat'), laborUnitPrice: 0, category: 'paredes' },
-      { name: 'Montante galvanizado 69mm x 2.60m', unit: 'un', qty: montantes, unitPrice: getCatPrice('paredes', 'montante_69', 'mat'), laborUnitPrice: 0, category: 'paredes' },
-      { name: 'Solera galvanizada 70mm x 2.60m', unit: 'un', qty: soleras, unitPrice: getCatPrice('paredes', 'solera_70', 'mat'), laborUnitPrice: 0, category: 'paredes' },
-      { name: 'Tornillos T1 aguja (x100)', unit: 'paq', qty: Math.ceil(m2 / 12), unitPrice: getCatPrice('paredes', 'tornillos_t1', 'mat'), laborUnitPrice: 0, category: 'paredes' },
-      { name: 'Tornillos T2 aguja (x100)', unit: 'paq', qty: Math.ceil(m2 / 6), unitPrice: getCatPrice('paredes', 'tornillos_t2', 'mat'), laborUnitPrice: 0, category: 'paredes' },
-      { name: 'Cinta de papel para juntas (75m)', unit: 'rollo', qty: Math.ceil(m2 / 30), unitPrice: getCatPrice('paredes', 'cinta_papel', 'mat'), laborUnitPrice: 0, category: 'paredes' },
-      { name: 'Masilla para juntas lista', unit: 'kg', qty: masilla, unitPrice: getCatPrice('paredes', 'masilla_kg', 'mat'), laborUnitPrice: 0, category: 'paredes' },
-      { name: 'Lana de vidrio aislante 50mm', unit: 'm²', qty: m2, unitPrice: getCatPrice('paredes', 'lana_vidrio', 'mat'), laborUnitPrice: 0, category: 'paredes' },
-      { name: 'Mano de obra armado y emplacado Drywall', unit: 'm²', qty: m2, unitPrice: 0, laborUnitPrice: Math.round(getCatPrice('paredes', 'placa_std', 'mo') * 1.5), category: 'paredes' }
+      { name: 'Placa de yeso estándar 12.5mm (u)', unit: 'u', qty: placas, unitPrice: getCatPrice('paredes', 'seco_placa_std', 'mat') || 16500, laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Perfil Montante 70mm (u)', unit: 'u', qty: montantes, unitPrice: getCatPrice('paredes', 'seco_montante', 'mat') || 6850, laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Perfil Solera 70mm (u)', unit: 'u', qty: soleras, unitPrice: getCatPrice('paredes', 'seco_solera', 'mat') || 5900, laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Bolsa de tornillos T2 para placa (100u)', unit: 'bolsa', qty: Math.ceil(m2 / 10), unitPrice: 2200, laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Cinta de papel para juntas (m)', unit: 'm', qty: Math.round(m2 * 2.2), unitPrice: 120, laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Masilla para drywall (kg)', unit: 'kg', qty: Math.round(m2 * 1.6), unitPrice: 2450, laborUnitPrice: 0, category: 'paredes' },
+      { name: 'Lana de vidrio aislante (m²)', unit: 'm²', qty: Math.round(m2), unitPrice: 5800, laborUnitPrice: 0, category: 'paredes' }
     ];
-  } else if (lower.includes('pint') || lower.includes('latex') || lower.includes('rodillo') || lower.includes('enduido')) {
+    laborEstimate = {
+      amount: moTotalDrywall,
+      scope: `Mano de obra armado y masillado tabique Drywall (${m2} m²)`
+    };
+  } else if (lower.includes('pint') || lower.includes('habitaci') || lower.includes('pieza') || lower.includes('cuarto') || lower.includes('pared')) {
     category = 'pintura';
-    const m2 = qtyNum > 0 ? qtyNum : 40;
-    explanation = `He calculado el cómputo de pintura para **${m2} m² de superficie** a 2 manos. Incluye látex lavable de alto poder cubritivo, fijador sellador concentrado, enduido plástico para enderezar imperfecciones, lijas, cinta de pintor y mano de obra de aplicación.`;
+    let m2 = 45;
+    if (roomMatch) {
+      const w = parseFloat(roomMatch[1]), l = parseFloat(roomMatch[2]);
+      m2 = Math.round((w + l) * 2 * 2.6 + (w * l));
+    } else if (qtyNum > 0) {
+      m2 = qtyNum;
+    }
+    const baldes20 = Math.ceil(m2 / 100);
+    const moTotalPintura = Math.round(m2 * 5500);
+    explanation = `He preparado el cómputo de materiales para **${m2} m² de pintura interior** (habitación/ambiente). La mano de obra se presupuesta por el ambiente completo (${cInfo.sym} ${safeFormatNum(moTotalPintura)}) con preparación de superficie, lijado, fijador y 2 manos de látex lavable.`;
     items = [
-      { name: 'Látex lavable interior (20L)', unit: 'balde', qty: Math.ceil(m2 / 70), unitPrice: getCatPrice('pintura', 'latex_int_20', 'mat'), laborUnitPrice: 0, category: 'pintura' },
-      { name: 'Fijador sellador al agua (1L)', unit: 'un', qty: Math.ceil(m2 / 30), unitPrice: getCatPrice('pintura', 'fijador_1l', 'mat'), laborUnitPrice: 0, category: 'pintura' },
-      { name: 'Enduido plástico interior', unit: 'kg', qty: Math.ceil(m2 * 0.15), unitPrice: getCatPrice('pintura', 'enduido_kg', 'mat'), laborUnitPrice: 0, category: 'pintura' },
-      { name: 'Rodillo lana antigota 22cm', unit: 'un', qty: 1, unitPrice: getCatPrice('pintura', 'rodillo_22', 'mat'), laborUnitPrice: 0, category: 'pintura' },
-      { name: 'Cinta enmascarar pintor 48mm', unit: 'un', qty: 2, unitPrice: getCatPrice('pintura', 'cinta_enmascarar', 'mat'), laborUnitPrice: 0, category: 'pintura' },
-      { name: 'Lija al agua grano medio', unit: 'pliego', qty: 5, unitPrice: getCatPrice('pintura', 'lija_pliego', 'mat'), laborUnitPrice: 0, category: 'pintura' },
-      { name: 'Mano de obra pintura interior a 2 manos', unit: 'm²', qty: m2, unitPrice: 0, laborUnitPrice: Math.round(getCatPrice('pintura', 'latex_int_20', 'mo') * 0.4), category: 'pintura' }
+      { name: 'Pintura Látex Interior 20L', unit: 'u', qty: baldes20, unitPrice: getCatPrice('pintura', 'pint_latex_20l', 'mat') || 110000, laborUnitPrice: 0, category: 'pintura' },
+      { name: 'Sellador Fijador concentrado 1L', unit: 'u', qty: Math.max(1, Math.ceil(m2 / 40)), unitPrice: 11500, laborUnitPrice: 0, category: 'pintura' },
+      { name: 'Enduido plástico interior (kg)', unit: 'kg', qty: Math.max(2, Math.round(m2 * 0.15)), unitPrice: 4200, laborUnitPrice: 0, category: 'pintura' },
+      { name: 'Lija para pared (pliegos)', unit: 'u', qty: Math.max(3, Math.ceil(m2 / 15)), unitPrice: 950, laborUnitPrice: 0, category: 'pintura' },
+      { name: 'Cinta de enmascarar (m)', unit: 'm', qty: 50, unitPrice: 150, laborUnitPrice: 0, category: 'pintura' },
+      { name: 'Rodillo antigota 22cm', unit: 'u', qty: 1, unitPrice: 9800, laborUnitPrice: 0, category: 'pintura' }
     ];
-  } else if (lower.includes('baño') || lower.includes('plomer') || lower.includes('agua') || lower.includes('inodoro') || lower.includes('caño') || lower.includes('termofusion') || lower.includes('griferia')) {
-    category = 'plomeria';
-    explanation = `He preparado el desglose para la **instalación sanitaria de un baño completo**. Contempla distribución de agua fría/caliente en termofusión, desagües primarios/secundarios en PVC sanitario, llaves de paso esféricas, kit de loza y mano de obra de plomería integral.`;
-    items = [
-      { name: 'Tubo termofusión Ø20mm x 4m', unit: 'barra', qty: 4, unitPrice: getCatPrice('plomeria', 'tubo_termo_20', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
-      { name: 'Tubo termofusión Ø25mm x 4m', unit: 'barra', qty: 2, unitPrice: getCatPrice('plomeria', 'tubo_termo_25', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
-      { name: 'Codos 90° termofusión Ø20mm', unit: 'un', qty: 10, unitPrice: getCatPrice('plomeria', 'codo_termo_20', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
-      { name: 'Caño PVC sanitario Ø110 x 4m', unit: 'barra', qty: 2, unitPrice: getCatPrice('plomeria', 'cano_pvc_110', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
-      { name: 'Caño PVC sanitario Ø40 x 4m', unit: 'barra', qty: 3, unitPrice: getCatPrice('plomeria', 'cano_pvc_40', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
-      { name: 'Pileta de patio con rejilla', unit: 'un', qty: 1, unitPrice: getCatPrice('plomeria', 'pileta_patio', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
-      { name: 'Llave de paso esférica con campana', unit: 'un', qty: 2, unitPrice: getCatPrice('plomeria', 'llave_paso_20', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
-      { name: 'Kit inodoro con mochila y bidet', unit: 'kit', qty: 1, unitPrice: getCatPrice('plomeria', 'kit_inodoro', 'mat'), laborUnitPrice: 0, category: 'plomeria' },
-      { name: 'Mano de obra instalación sanitaria integral', unit: 'gl', qty: 1, unitPrice: 0, laborUnitPrice: Math.round(getCatPrice('plomeria', 'kit_inodoro', 'mo') * 2.5), category: 'plomeria' }
-    ];
+    laborEstimate = {
+      amount: moTotalPintura,
+      scope: `Mano de obra completa pintura interior y preparación (${m2} m²)`
+    };
   } else {
-    const qty = qtyNum > 0 ? qtyNum : 1;
-    explanation = `He interpretado tu requerimiento y generado una partida técnica estimada para **"${escapeHtml(prompt)}"**. Puedes ajustar sus precios o cantidades en cualquier momento.`;
+    explanation = `Entendido. Para tu consulta sobre **"${prompt.trim()}"**, he estimado los materiales requeridos y una mano de obra integral por el conjunto del trabajo.`;
     items = [
-      { name: prompt.length > 50 ? prompt.substring(0, 48) + '...' : prompt, unit: qtyNum > 0 ? 'un' : 'gl', qty: qty, unitPrice: Math.round(cInfo.mult * 8000), laborUnitPrice: Math.round(cInfo.mult * 6000), category: 'libre' }
+      { name: prompt.length > 40 ? prompt.substring(0, 38) + '...' : prompt, unit: 'gl', qty: 1, unitPrice: Math.round(cInfo.mult * 45000), laborUnitPrice: 0, category: 'libre' }
     ];
+    laborEstimate = {
+      amount: Math.round(cInfo.mult * 65000),
+      scope: `Mano de obra completa para: ${prompt.substring(0, 45)}`
+    };
   }
 
-  return { text: explanation, items };
+  return {
+    text: explanation,
+    items,
+    laborEstimate
+  };
 }
+
 
 function getCatPrice(category, itemId, type) {
   const cat = CATEGORIES_CATALOG[category];
