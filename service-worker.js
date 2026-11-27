@@ -1,8 +1,9 @@
 // PresupuestAPP - Service Worker (Network-First Strategy)
-const CACHE_NAME = 'presupuestapp-v2';
+const CACHE_NAME = 'presupuestapp-v3';
 const URLS_TO_CACHE = [
   '/presupuestAPP/',
   '/presupuestAPP/index.html',
+  '/presupuestAPP/data/precios_presupuestapp.json',
   '/presupuestAPP/precios-referencia.js',
   '/presupuestAPP/manifest.json',
   '/presupuestAPP/icon-192.png',

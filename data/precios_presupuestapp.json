@@ -1,0 +1,475 @@
+{
+  "ultima_actualizacion": "2026-11-27",
+  "moneda": "ARS",
+  "materiales": [
+    {
+      "id": "elec_caja_oct",
+      "rubro": "Electricidad",
+      "nombre": "Caja octogonal de techo",
+      "unidad": "u",
+      "precio_material": 600
+    },
+    {
+      "id": "elec_caja_rect",
+      "rubro": "Electricidad",
+      "nombre": "Caja rectangular 5x10",
+      "unidad": "u",
+      "precio_material": 550
+    },
+    {
+      "id": "elec_cano_corr",
+      "rubro": "Electricidad",
+      "nombre": "Caño corrugado (m)",
+      "unidad": "m",
+      "precio_material": 750
+    },
+    {
+      "id": "elec_cano_pvc",
+      "rubro": "Electricidad",
+      "nombre": "Caño rígido PVC (m)",
+      "unidad": "m",
+      "precio_material": 1400
+    },
+    {
+      "id": "elec_tab_prin",
+      "rubro": "Electricidad",
+      "nombre": "Tablero principal (4 a 8 módulos)",
+      "unidad": "u",
+      "precio_material": 11500
+    },
+    {
+      "id": "elec_tab_sec",
+      "rubro": "Electricidad",
+      "nombre": "Tablero secundario",
+      "unidad": "u",
+      "precio_material": 8500
+    },
+    {
+      "id": "elec_cable_15",
+      "rubro": "Electricidad",
+      "nombre": "Cable unipolar 1.5mm² (m)",
+      "unidad": "m",
+      "precio_material": 650
+    },
+    {
+      "id": "elec_cable_25",
+      "rubro": "Electricidad",
+      "nombre": "Cable unipolar 2.5mm² (m)",
+      "unidad": "m",
+      "precio_material": 1050
+    },
+    {
+      "id": "elec_cable_4",
+      "rubro": "Electricidad",
+      "nombre": "Cable unipolar 4mm² (m)",
+      "unidad": "m",
+      "precio_material": 1650
+    },
+    {
+      "id": "elec_cable_tierra",
+      "rubro": "Electricidad",
+      "nombre": "Cable de tierra 2.5mm² (m)",
+      "unidad": "m",
+      "precio_material": 1050
+    },
+    {
+      "id": "elec_mod_int",
+      "rubro": "Electricidad",
+      "nombre": "Módulo interruptor / tecla",
+      "unidad": "u",
+      "precio_material": 1800
+    },
+    {
+      "id": "elec_mod_10a",
+      "rubro": "Electricidad",
+      "nombre": "Módulo toma corriente 10A",
+      "unidad": "u",
+      "precio_material": 2100
+    },
+    {
+      "id": "elec_mod_20a",
+      "rubro": "Electricidad",
+      "nombre": "Módulo toma 20A (aire acondicionado/reforzado)",
+      "unidad": "u",
+      "precio_material": 3800
+    },
+    {
+      "id": "elec_termica",
+      "rubro": "Electricidad",
+      "nombre": "Térmica bipolar 16A/25A",
+      "unidad": "u",
+      "precio_material": 14500
+    },
+    {
+      "id": "elec_disyuntor",
+      "rubro": "Electricidad",
+      "nombre": "Disyuntor diferencial 40A",
+      "unidad": "u",
+      "precio_material": 42000
+    },
+    {
+      "id": "elec_jabalina",
+      "rubro": "Electricidad",
+      "nombre": "Jabalina con tomacables",
+      "unidad": "u",
+      "precio_material": 15500
+    },
+    {
+      "id": "elec_cinta",
+      "rubro": "Electricidad",
+      "nombre": "Cinta aisladora",
+      "unidad": "u",
+      "precio_material": 1800
+    },
+    {
+      "id": "elec_bastidor",
+      "rubro": "Electricidad",
+      "nombre": "Bastidores y tapas",
+      "unidad": "u",
+      "precio_material": 2400
+    },
+    {
+      "id": "elec_grampas",
+      "rubro": "Electricidad",
+      "nombre": "Abrazaderas / Grampas (pack 10u)",
+      "unidad": "pack",
+      "precio_material": 3200
+    },
+    {
+      "id": "seco_placa_std",
+      "rubro": "Construcción en Seco",
+      "nombre": "Placa de yeso estándar 12.5mm (u)",
+      "unidad": "u",
+      "precio_material": 16500
+    },
+    {
+      "id": "seco_placa_rh",
+      "rubro": "Construcción en Seco",
+      "nombre": "Placa de yeso resistente a humedad (RH) (u)",
+      "unidad": "u",
+      "precio_material": 22800
+    },
+    {
+      "id": "seco_montante",
+      "rubro": "Construcción en Seco",
+      "nombre": "Perfil Montante 70mm (u)",
+      "unidad": "u",
+      "precio_material": 6850
+    },
+    {
+      "id": "seco_solera",
+      "rubro": "Construcción en Seco",
+      "nombre": "Perfil Solera 70mm (u)",
+      "unidad": "u",
+      "precio_material": 5900
+    },
+    {
+      "id": "seco_omega",
+      "rubro": "Construcción en Seco",
+      "nombre": "Perfil Omega (u)",
+      "unidad": "u",
+      "precio_material": 4600
+    },
+    {
+      "id": "seco_torn_t1",
+      "rubro": "Construcción en Seco",
+      "nombre": "Bolsa de tornillos T1 mecha (100u)",
+      "unidad": "bolsa",
+      "precio_material": 2400
+    },
+    {
+      "id": "seco_torn_t2",
+      "rubro": "Construcción en Seco",
+      "nombre": "Bolsa de tornillos T2 para placa (100u)",
+      "unidad": "bolsa",
+      "precio_material": 2200
+    },
+    {
+      "id": "seco_cinta_papel",
+      "rubro": "Construcción en Seco",
+      "nombre": "Cinta de papel para juntas (m)",
+      "unidad": "m",
+      "precio_material": 120
+    },
+    {
+      "id": "seco_masilla",
+      "rubro": "Construcción en Seco",
+      "nombre": "Masilla para drywall (kg)",
+      "unidad": "kg",
+      "precio_material": 2450
+    },
+    {
+      "id": "seco_lana",
+      "rubro": "Construcción en Seco",
+      "nombre": "Lana de vidrio aislante (m²)",
+      "unidad": "m²",
+      "precio_material": 5800
+    },
+    {
+      "id": "ext_banda_acust",
+      "rubro": "Construcción en Seco",
+      "nombre": "Banda acústica para perfiles 70mm (rollo 30m)",
+      "unidad": "u",
+      "precio_material": 9800
+    },
+    {
+      "id": "ext_cantonera",
+      "rubro": "Construcción en Seco",
+      "nombre": "Cantonera metálica/PVC 2.60m",
+      "unidad": "u",
+      "precio_material": 3200
+    },
+    {
+      "id": "ext_fijaciones",
+      "rubro": "Construcción en Seco",
+      "nombre": "Tarugos del 8 con tornillos (pack 50u)",
+      "unidad": "pack",
+      "precio_material": 3500
+    },
+    {
+      "id": "alb_lad_hueco",
+      "rubro": "Albañilería",
+      "nombre": "Ladrillo hueco 12x18x33 (u)",
+      "unidad": "u",
+      "precio_material": 795
+    },
+    {
+      "id": "alb_lad_comun",
+      "rubro": "Albañilería",
+      "nombre": "Ladrillo común (u)",
+      "unidad": "u",
+      "precio_material": 320
+    },
+    {
+      "id": "alb_cemento",
+      "rubro": "Albañilería",
+      "nombre": "Cemento bolsa 50kg",
+      "unidad": "bolsa",
+      "precio_material": 12650
+    },
+    {
+      "id": "alb_cal",
+      "rubro": "Albañilería",
+      "nombre": "Cal bolsa",
+      "unidad": "bolsa",
+      "precio_material": 8200
+    },
+    {
+      "id": "alb_arena",
+      "rubro": "Albañilería",
+      "nombre": "Arena gruesa (m³)",
+      "unidad": "m³",
+      "precio_material": 45000
+    },
+    {
+      "id": "alb_hierro",
+      "rubro": "Albañilería",
+      "nombre": "Hierro del 6 / del 8 (barra 12m)",
+      "unidad": "u",
+      "precio_material": 11500
+    },
+    {
+      "id": "ext_piedra",
+      "rubro": "Albañilería",
+      "nombre": "Piedra partida (m³)",
+      "unidad": "m³",
+      "precio_material": 52000
+    },
+    {
+      "id": "ext_alambre",
+      "rubro": "Albañilería",
+      "nombre": "Alambre negro recocido N°16 (kg)",
+      "unidad": "kg",
+      "precio_material": 4600
+    },
+    {
+      "id": "ext_hidrofugo",
+      "rubro": "Albañilería",
+      "nombre": "Hidrófugo químico (bidón 10L)",
+      "unidad": "u",
+      "precio_material": 18500
+    },
+    {
+      "id": "san_termo_20",
+      "rubro": "Sanitarios",
+      "nombre": "Caño termofusión agua fría/caliente 20mm (m)",
+      "unidad": "m",
+      "precio_material": 1850
+    },
+    {
+      "id": "san_termo_25",
+      "rubro": "Sanitarios",
+      "nombre": "Caño termofusión 25mm (m)",
+      "unidad": "m",
+      "precio_material": 2600
+    },
+    {
+      "id": "san_codo_90",
+      "rubro": "Sanitarios",
+      "nombre": "Codos 90° termofusión (u)",
+      "unidad": "u",
+      "precio_material": 850
+    },
+    {
+      "id": "san_cupla_te",
+      "rubro": "Sanitarios",
+      "nombre": "Cuplas / Te termofusión (u)",
+      "unidad": "u",
+      "precio_material": 1100
+    },
+    {
+      "id": "san_llave_paso",
+      "rubro": "Sanitarios",
+      "nombre": "Llave de paso esférica",
+      "unidad": "u",
+      "precio_material": 12500
+    },
+    {
+      "id": "san_desague_40",
+      "rubro": "Sanitarios",
+      "nombre": "Caño PVC/Polipropileno desagüe 40mm (m)",
+      "unidad": "m",
+      "precio_material": 2800
+    },
+    {
+      "id": "san_desague_110",
+      "rubro": "Sanitarios",
+      "nombre": "Caño desagüe 110mm (m)",
+      "unidad": "m",
+      "precio_material": 8200
+    },
+    {
+      "id": "san_pileta_patio",
+      "rubro": "Sanitarios",
+      "nombre": "Pileta de patio / Rejilla sifonada",
+      "unidad": "u",
+      "precio_material": 9500
+    },
+    {
+      "id": "san_kit_inodoro",
+      "rubro": "Sanitarios",
+      "nombre": "Kit instalación de inodoro y bidet",
+      "unidad": "u",
+      "precio_material": 14500
+    },
+    {
+      "id": "san_kit_vanitory",
+      "rubro": "Sanitarios",
+      "nombre": "Kit instalación vanitory/lavatorio",
+      "unidad": "u",
+      "precio_material": 16500
+    },
+    {
+      "id": "san_monocomando",
+      "rubro": "Sanitarios",
+      "nombre": "Grifería monocomando cocina/baño (u)",
+      "unidad": "u",
+      "precio_material": 62000
+    },
+    {
+      "id": "san_flexible",
+      "rubro": "Sanitarios",
+      "nombre": "Flexible metálico",
+      "unidad": "u",
+      "precio_material": 4800
+    },
+    {
+      "id": "ext_pegamento_pvc",
+      "rubro": "Sanitarios",
+      "nombre": "Pegamento PVC + cinta teflón (kit)",
+      "unidad": "kit",
+      "precio_material": 7400
+    },
+    {
+      "id": "ext_caja_insp",
+      "rubro": "Sanitarios",
+      "nombre": "Caja de inspección / cámara séptica PVC",
+      "unidad": "u",
+      "precio_material": 28000
+    },
+    {
+      "id": "pint_latex_4l",
+      "rubro": "Pinturería",
+      "nombre": "Pintura Látex Interior 4L",
+      "unidad": "u",
+      "precio_material": 28500
+    },
+    {
+      "id": "pint_latex_10l",
+      "rubro": "Pinturería",
+      "nombre": "Pintura Látex Interior 10L",
+      "unidad": "u",
+      "precio_material": 62000
+    },
+    {
+      "id": "pint_latex_20l",
+      "rubro": "Pinturería",
+      "nombre": "Pintura Látex Interior 20L",
+      "unidad": "u",
+      "precio_material": 110000
+    },
+    {
+      "id": "pint_exterior_20l",
+      "rubro": "Pinturería",
+      "nombre": "Pintura Látex Exterior / Frente",
+      "unidad": "u",
+      "precio_material": 125000
+    },
+    {
+      "id": "pint_sellador",
+      "rubro": "Pinturería",
+      "nombre": "Sellador Fijador concentrado 1L",
+      "unidad": "u",
+      "precio_material": 11500
+    },
+    {
+      "id": "pint_enduido",
+      "rubro": "Pinturería",
+      "nombre": "Enduido plástico interior (kg)",
+      "unidad": "kg",
+      "precio_material": 4200
+    },
+    {
+      "id": "pint_rodillo",
+      "rubro": "Pinturería",
+      "nombre": "Rodillo antigota 22cm",
+      "unidad": "u",
+      "precio_material": 9800
+    },
+    {
+      "id": "pint_pincel",
+      "rubro": "Pinturería",
+      "nombre": "Pincel / Brocha 2\"",
+      "unidad": "u",
+      "precio_material": 4200
+    },
+    {
+      "id": "pint_cinta",
+      "rubro": "Pinturería",
+      "nombre": "Cinta de enmascarar (m)",
+      "unidad": "m",
+      "precio_material": 150
+    },
+    {
+      "id": "pint_lija",
+      "rubro": "Pinturería",
+      "nombre": "Lija para pared (pliegos)",
+      "unidad": "u",
+      "precio_material": 950
+    },
+    {
+      "id": "pint_aguaras",
+      "rubro": "Pinturería",
+      "nombre": "Aguarás / Diluyente",
+      "unidad": "u",
+      "precio_material": 5200
+    },
+    {
+      "id": "ext_bandeja_pint",
+      "rubro": "Pinturería",
+      "nombre": "Bandeja plástica + extensor básico",
+      "unidad": "kit",
+      "precio_material": 11200
+    }
+  ]
+}

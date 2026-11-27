@@ -808,6 +808,156 @@ const CATEGORIES = {
 /* ═══════════════════════════════════════════════════════════
    CATEGORIES_CATALOG: TECHNICAL ITEMIZED DATABASE
 ═══════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════
+   DYNAMIC PRICE LOADER (data/precios_presupuestapp.json)
+═══════════════════════════════════════════════════════════ */
+function aplicarPreciosAlCatalogo(data) {
+  if (!data || !Array.isArray(data.materiales)) return;
+
+  if (data.ultima_actualizacion) S.preciosRefFecha = data.ultima_actualizacion;
+  if (data.moneda) S.preciosMoneda = data.moneda;
+
+  const rubroMap = {
+    'electricidad': 'electricidad',
+    'construcción en seco': 'paredes',
+    'construccion en seco': 'paredes',
+    'seco': 'paredes',
+    'drywall': 'paredes',
+    'albañilería': 'paredes',
+    'albanileria': 'paredes',
+    'mamposteria': 'paredes',
+    'sanitarios': 'plomeria',
+    'plomeria': 'plomeria',
+    'sanitaria': 'plomeria',
+    'pinturería': 'pintura',
+    'pintureria': 'pintura',
+    'pintura': 'pintura'
+  };
+
+  const norm = s => (s || '').toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+
+  data.materiales.forEach(m => {
+    const pMat = parseFloat(m.precio_material) || 0;
+    const rubroKey = (m.rubro || '').toLowerCase().trim();
+    const targetCatKey = rubroMap[rubroKey] || 'paredes';
+    const cat = CATEGORIES_CATALOG[targetCatKey];
+    if (!cat) return;
+
+    let matched = false;
+
+    // 1. Buscar coincidencia exacta por ID o nombre
+    for (const grp of cat.groups) {
+      for (const it of grp.items) {
+        if (it.id === m.id || norm(it.name) === norm(m.nombre) || norm(it.name).includes(norm(m.nombre)) || norm(m.nombre).includes(norm(it.name))) {
+          it.prices.ar.mat = pMat;
+          if (m.unidad) it.unit = m.unidad;
+          it.name = m.nombre;
+          matched = true;
+          break;
+        }
+      }
+      if (matched) break;
+    }
+
+    // 2. Si es un insumo nuevo que no existía en el catálogo, incorporarlo al grupo correspondiente
+    if (!matched) {
+      let targetGroup = cat.groups[0];
+      if (m.rubro === 'Construcción en Seco') {
+        targetGroup = cat.groups.find(g => g.id.includes('fijacion') || g.id.includes('placa')) || cat.groups[0];
+      } else if (m.rubro === 'Albañilería') {
+        targetGroup = cat.groups.find(g => g.id.includes('mamposteria')) || cat.groups[0];
+      } else if (m.rubro === 'Sanitarios') {
+        targetGroup = cat.groups.find(g => g.id.includes('artefactos') || g.id.includes('desague') || g.id.includes('caneria')) || cat.groups[0];
+      } else if (m.rubro === 'Pinturería') {
+        targetGroup = cat.groups.find(g => g.id.includes('herramientas') || g.id.includes('materiales')) || cat.groups[0];
+      }
+
+      let defaultMO = 0;
+      if (m.unidad === 'm' || m.unidad === 'm²') defaultMO = Math.round(pMat * 0.55);
+      else if (m.unidad === 'u') defaultMO = Math.round(pMat * 0.45);
+      else defaultMO = 0;
+
+      targetGroup.items.push({
+        id: m.id,
+        name: m.nombre,
+        name_en: m.nombre,
+        unit: m.unidad || 'u',
+        prices: {
+          ar: { mat: pMat, mo: defaultMO },
+          es: { mat: Math.round(pMat / 1000 * 1.1), mo: Math.round(defaultMO / 1000 * 1.5) },
+          us: { mat: Math.round(pMat / 1200 * 1.1), mo: Math.round(defaultMO / 1200 * 1.8) }
+        }
+      });
+    }
+  });
+
+  // Si ya hay ítems cargados en el presupuesto activo (S.items), actualizar sus unitMat
+  if (S.items && S.items.length > 0) {
+    const desp = S.cliente.desp || 0.10;
+    S.items.forEach(it => {
+      const jsonItem = data.materiales.find(m => m.id === it.catalogId || norm(m.nombre) === norm(it.nombre));
+      if (jsonItem) {
+        it.unitMat = parseFloat(jsonItem.precio_material) || it.unitMat;
+        const baseM = it.qty * it.unitMat;
+        it.matBase = baseM;
+        it.merma = baseM * desp;
+        it.subtMat = baseM + it.merma;
+        it.total = it.subtMat + it.subtMO + (it.gan || 0);
+      }
+    });
+    if (typeof recalc === 'function') recalc();
+  }
+}
+
+// Carga inmediata de respaldo offline de localStorage al iniciar el script
+(function initCachedPrecios() {
+  try {
+    const cached = localStorage.getItem('presupuestapp_precios_cache');
+    if (cached) {
+      const data = JSON.parse(cached);
+      if (data && Array.isArray(data.materiales)) {
+        aplicarPreciosAlCatalogo(data);
+        console.log('[Precios] Cargado respaldo inicial de localStorage (' + data.materiales.length + ' insumos)');
+      }
+    }
+  } catch(e) {}
+})();
+
+async function cargarPreciosDesdeJson() {
+  const paths = [
+    './data/precios_presupuestapp.json',
+    './public/data/precios_presupuestapp.json',
+    'data/precios_presupuestapp.json'
+  ];
+
+  let data = null;
+  S.preciosLoading = true;
+
+  for (const p of paths) {
+    try {
+      const res = await fetch(p, { cache: 'no-cache' });
+      if (res.ok) {
+        data = await res.json();
+        if (data && Array.isArray(data.materiales)) {
+          try {
+            localStorage.setItem('presupuestapp_precios_cache', JSON.stringify(data));
+          } catch(e) {}
+          console.log('[Precios] Cargados exitosamente desde:', p, '(' + data.materiales.length + ' insumos)');
+          break;
+        }
+      }
+    } catch(e) {}
+  }
+
+  if (data && Array.isArray(data.materiales)) {
+    aplicarPreciosAlCatalogo(data);
+  }
+
+  S.preciosLoading = false;
+  if (typeof render === 'function') render();
+}
+
 const CATEGORIES_CATALOG = {
   electricidad: {
     id: 'electricidad',
@@ -1156,6 +1306,9 @@ const initialUser = getInitialUser();
 const storedDraft = getStoredDraft();
 
 const S = {
+  preciosRefFecha: '2026-11-27',
+  preciosMoneda: 'ARS',
+  preciosLoading: false,
   lang: getStoredLang(),
   country: 'ar',
   paso: storedDraft ? (storedDraft.paso || 1) : 1,
@@ -1770,6 +1923,9 @@ function paso1() {
             `).join('')}
           </div>
           <div style="font-size:11px;color:var(--text3);">${t('waste_desc')}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:6px;display:flex;align-items:center;gap:5px;">
+            <span>📅 Tarifas base de referencia: <b>${S.preciosRefFecha || '2026-11-27'}</b> (${S.preciosMoneda || 'ARS'})</span>
+          </div>
         </div>
 
         <div style="display:flex;gap:10px;margin-top:6px;">
@@ -1815,6 +1971,9 @@ function paso2() {
         <div>
           <h1 style="font-size:20px;font-weight:900;color:var(--text);letter-spacing:-0.5px;margin-bottom:3px;">${t('step2_title')}</h1>
           <p style="font-size:12px;color:var(--text3);">Selecciona un rubro técnico para desplegar el catálogo de materiales e insumos:</p>
+          <div style="font-size:11px;color:var(--accent);font-weight:700;margin-top:3px;display:flex;align-items:center;gap:6px;">
+            <span>📅 Precios de insumos: ${S.preciosRefFecha || '2026-11-27'} (${S.preciosMoneda || 'ARS'}) · Cargado desde precios_presupuestapp.json</span>
+          </div>
         </div>
         <button onclick="saveCurrentProject()" class="btn-pill no-print" style="padding:5px 9px;font-size:11px;">
           ${ic('save', 12)} <span>${t('save_work')}</span>
@@ -4206,6 +4365,8 @@ function addAiItemsToBudget(msgIndex) {
 }
 
 render();
+// Iniciar carga asíncrona de precios externos
+cargarPreciosDesdeJson();
 </script>
 
 <script>
