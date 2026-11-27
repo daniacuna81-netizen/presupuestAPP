@@ -1,8 +1,9 @@
 // PresupuestAPP - Service Worker (Network-First Strategy)
-const CACHE_NAME = 'presupuestapp-v1';
+const CACHE_NAME = 'presupuestapp-v2';
 const URLS_TO_CACHE = [
   '/presupuestAPP/',
   '/presupuestAPP/index.html',
+  '/presupuestAPP/precios-referencia.js',
   '/presupuestAPP/manifest.json',
   '/presupuestAPP/icon-192.png',
   '/presupuestAPP/icon-512.png'
@@ -60,7 +61,7 @@ self.addEventListener('fetch', event => {
             console.log('[SW] Serving from cache:', event.request.url);
             return cachedResponse;
           }
-          // Last resort: return offline page if main index is cached
+          // Fallback to cached index.html
           return caches.match('/presupuestAPP/index.html');
         });
       })

@@ -6,6 +6,7 @@
   <title>PresupuestAPP — SaaS Obras & Servicios B2B</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="precios-referencia.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
   <style>
@@ -588,29 +589,51 @@
       --sar: env(safe-area-inset-right, 0px);
     }
 
-    /* Topbar padding: safe from notification bar/notch */
+    /* Topbar padding: seguro ante la barra de estado/notificaciones/cámara */
     .topbar {
-      padding-top: max(10px, calc(6px + var(--sat))) !important;
+      padding-top: max(12px, calc(8px + var(--sat))) !important;
       padding-left: max(16px, calc(10px + var(--sal))) !important;
       padding-right: max(16px, calc(10px + var(--sar))) !important;
+      padding-bottom: 10px !important;
+    }
+
+    /* Padding de scroll inferior generoso para que nada quede tapado por botones flotantes o barras de gestos */
+    .content {
+      padding-bottom: calc(140px + var(--sab)) !important;
+      padding-left: max(12px, var(--sal)) !important;
+      padding-right: max(12px, var(--sar)) !important;
     }
 
     @media (max-width: 768px) {
+      .sidebar { display: none !important; }
+      .main-area { margin-left: 0 !important; }
+      .desktop-only { display: none !important; }
+      .mobile-only { display: flex !important; }
+      .sim-toggle-btn { display: none !important; }
+      
       .topbar {
-        padding-top: max(12px, calc(8px + var(--sat))) !important;
-        padding-bottom: 10px !important;
+        padding-top: max(14px, calc(10px + var(--sat))) !important;
+        padding-bottom: 11px !important;
         padding-left: max(12px, calc(6px + var(--sal))) !important;
         padding-right: max(12px, calc(6px + var(--sar))) !important;
       }
+      
       .content {
-        padding-bottom: calc(115px + var(--sab)) !important;
+        padding-top: 14px !important;
+        padding-bottom: calc(145px + var(--sab)) !important;
+        max-width: 100% !important;
       }
+
       .modal-sheet {
-        padding-bottom: calc(24px + var(--sab)) !important;
+        padding-bottom: calc(26px + var(--sab)) !important;
+      }
+
+      .catalog-footer-sticky {
+        padding-bottom: calc(16px + var(--sab)) !important;
       }
     }
 
-    /* AI Chat Window responsive position and dimensions */
+    /* AI Chat Window adaptativo según dispositivo y safe-areas */
     .ai-chat-window {
       position: fixed !important;
       bottom: max(20px, calc(16px + var(--sab))) !important;
@@ -961,6 +984,26 @@ const CATEGORIES_CATALOG = {
 /* ═══════════════════════════════════════════════════════════
    INTERNATIONALIZATION (ES / EN)
 ═══════════════════════════════════════════════════════════ */
+
+// Sincronizar dinámicamente con precios-referencia.js si está presente
+if (typeof window !== 'undefined' && window.PRECIOS_REFERENCIA_ARS) {
+  const ref = window.PRECIOS_REFERENCIA_ARS;
+  ['electricidad', 'paredes', 'plomeria', 'pintura'].forEach(catKey => {
+    if (CATEGORIES_CATALOG[catKey] && ref[catKey] && ref[catKey].items) {
+      CATEGORIES_CATALOG[catKey].groups.forEach(grp => {
+        grp.items.forEach(it => {
+          const pRef = ref[catKey].items[it.id];
+          if (pRef) {
+            it.prices.ar.mat = pRef.precio_material;
+            it.prices.ar.mo = pRef.precio_mano_obra;
+            if (pRef.unidad) it.unit = pRef.unidad;
+          }
+        });
+      });
+    }
+  });
+}
+
 const I18N = {
   es: {
     app_subtitle: 'Software Técnico de Obras & Reformas',
@@ -1199,21 +1242,49 @@ function calcItem(catId, qty, opts = {}) {
 }
 
 function recalc() {
-  let mat = 0, mo = 0, gan = 0;
-  S.items.forEach(i => { mat += i.subtMat; mo += i.subtMO; gan += (i.gan || 0); });
-  
-  // 1. Opción Estándar: Materiales balanceados homologados
-  const totalStandard = mat + mo + gan;
+  const desp = S.cliente.desp || 0.10;
+  let totalMatBase = 0, totalMO = 0;
 
-  // 2. Opción Económica: Materiales estándar optimizados (-10%), mano de obra base y margen ajustado (12%)
-  const matEcon = mat * 0.90;
-  const moEcon = mo;
+  S.items.forEach(i => {
+    const pMat = i.unitMat || 0;
+    const pMO = i.unitMO || 0;
+    const q = i.qty || 0;
+    const baseM = q * pMat;
+    i.matBase = baseM;
+    i.merma = baseM * desp;
+    i.subtMat = baseM + i.merma;
+    i.subtMO = q * pMO;
+    i.gan = 0.20 * (i.subtMat + i.subtMO);
+    i.total = i.subtMat + i.subtMO + i.gan;
+
+    totalMatBase += baseM;
+    totalMO += i.subtMO;
+  });
+
+  // 1. Opción Estándar (Recomendada):
+  // Materiales de catálogo homologados, merma según % elegido, MO de referencia, margen formal 20%
+  const matBaseStd = totalMatBase;
+  const mermaStd = matBaseStd * desp;
+  const matStd = matBaseStd + mermaStd;
+  const moStd = totalMO;
+  const ganStd = 0.20 * (matStd + moStd);
+  const totalStandard = matStd + moStd + ganStd;
+
+  // 2. Opción Económica (Ahorro):
+  // Materiales estándar optimizados (-10%), merma según % elegido, MO base, margen accesible 12%
+  const matBaseEcon = totalMatBase * 0.90;
+  const mermaEcon = matBaseEcon * desp;
+  const matEcon = matBaseEcon + mermaEcon;
+  const moEcon = totalMO;
   const ganEcon = 0.12 * (matEcon + moEcon);
   const totalEcon = matEcon + moEcon + ganEcon;
 
-  // 3. Opción Premium: Marcas líderes 1ª línea (+30%), mano de obra certificada (+15%), margen 22%
-  const matPremium = mat * 1.30;
-  const moPremium = mo * 1.15;
+  // 3. Opción Premium (Alta Gama):
+  // Materiales de 1ª línea (+30%), merma según % elegido, MO certificada (+15%), margen 22%
+  const matBasePremium = totalMatBase * 1.30;
+  const mermaPremium = matBasePremium * desp;
+  const matPremium = matBasePremium + mermaPremium;
+  const moPremium = totalMO * 1.15;
   const ganPremium = 0.22 * (matPremium + moPremium);
   const totalPremium = matPremium + moPremium + ganPremium;
 
@@ -1226,9 +1297,13 @@ function recalc() {
       chip: isEn ? 'Recommended' : 'Recomendada',
       icon: '⭐',
       desc: isEn ? 'Certified standard materials, balanced durability and formal warranty.' : 'Materiales estándar homologados, excelente durabilidad y rendimiento balanceado.',
-      mat,
-      mo,
-      gan,
+      matBase: matBaseStd,
+      merma: mermaStd,
+      despPct: Math.round(desp * 100),
+      mat: matStd,
+      mo: moStd,
+      margenPct: 20,
+      gan: ganStd,
       total: totalStandard,
       warranty: isEn ? '180 days (6 months)' : '180 días (6 meses)'
     },
@@ -1238,8 +1313,12 @@ function recalc() {
       chip: isEn ? 'Cost-Saver' : 'Ahorro / Accesible',
       icon: '🏷️',
       desc: isEn ? 'Cost-optimized materials, efficient labor and competitive margin.' : 'Materiales estándar de costo optimizado, mano de obra eficiente y margen accesible.',
+      matBase: matBaseEcon,
+      merma: mermaEcon,
+      despPct: Math.round(desp * 100),
       mat: matEcon,
       mo: moEcon,
+      margenPct: 12,
       gan: ganEcon,
       total: totalEcon,
       warranty: isEn ? '60 days' : '60 días'
@@ -1250,8 +1329,12 @@ function recalc() {
       chip: isEn ? 'Top Tier' : 'Alta Gama',
       icon: '💎',
       desc: isEn ? 'Tier-1 leading brands (Schneider, Barbieri/Knauf, Tigre, Alba), reinforced seal and 1-year extended warranty.' : 'Marcas líderes de 1ª línea (Schneider/Sica, Barbieri/Knauf, Tigre, Alba), sellado reforzado y garantía extendida por 1 año.',
+      matBase: matBasePremium,
+      merma: mermaPremium,
+      despPct: Math.round(desp * 100),
       mat: matPremium,
       mo: moPremium,
+      margenPct: 22,
       gan: ganPremium,
       total: totalPremium,
       warranty: isEn ? '12 months (1 year)' : '12 meses (1 año)'
@@ -2026,25 +2109,36 @@ function paso3() {
           </span>
         </div>
 
-        <div style="background:var(--surface2);border-radius:10px;padding:10px 12px;margin:12px 0;font-size:12px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span style="color:var(--text3);">${t('mat_insumos')}</span>
-            <span style="color:var(--text);font-weight:700;">${curFmt(chosen.mat)}</span>
+        <div style="background:var(--surface2);border-radius:12px;padding:12px 14px;margin:14px 0;font-size:12px;">
+          <div style="font-size:11px;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:5px;">
+            Desglose Transparente de Costos
           </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span style="color:var(--text3);">${t('mo_especializada')}</span>
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+            <span style="color:var(--text2);">${t('mat_insumos')} (Cómputo neto):</span>
+            <span style="color:var(--text);font-weight:700;">${curFmt(chosen.matBase)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+            <span style="color:var(--text2);">+ Merma técnica de obra (${chosen.despPct}%):</span>
+            <span style="color:var(--text);font-weight:700;">${curFmt(chosen.merma)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
+            <span style="color:var(--text2);">+ ${t('mo_especializada')}:</span>
             <span style="color:var(--text);font-weight:700;">${curFmt(chosen.mo)}</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding-top:4px;border-top:1px solid var(--border);">
-            <span style="color:var(--text3);">${t('garantia_formal')}</span>
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+            <span style="color:var(--text2);">+ Margen operativo, herramental y beneficio (${chosen.margenPct}%):</span>
+            <span style="color:var(--text);font-weight:700;">${curFmt(chosen.gan)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding-top:6px;border-top:1px solid var(--border);">
+            <span style="color:var(--text3);">${t('garantia_formal')}:</span>
             <span style="color:${activeColor};font-weight:800;">${chosen.warranty} ✓</span>
           </div>
         </div>
 
-        <div style="display:flex;justify-content:space-between;align-items:baseline;padding-top:8px;border-top:2px solid var(--text);">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;padding-top:10px;border-top:2px solid var(--text);">
           <div>
-            <span style="font-size:13px;font-weight:900;color:var(--text);">${t('total_presupuesto')}</span>
-            <div style="font-size:10px;color:var(--text3);">${t('total_subtext')}</div>
+            <span style="font-size:14px;font-weight:900;color:var(--text);">${t('total_presupuesto')}</span>
+            <div style="font-size:10px;color:var(--text3);">Suma exacta: Materiales + Merma + Mano de Obra + Margen</div>
           </div>
           <span style="font-size:24px;font-weight:900;color:${activeColor};">${curFmt(chosen.total)}</span>
         </div>
@@ -3273,26 +3367,52 @@ function brandModal() {
 
 function pricesModal() {
   const cInfo = COUNTRIES[S.country];
+  const ref = (typeof window !== 'undefined' && window.PRECIOS_REFERENCIA_ARS) ? window.PRECIOS_REFERENCIA_ARS : null;
+  const fecha = ref?.metadata?.fecha_actualizacion || 'Noviembre 2026';
+
   return `
     <div class="modal-overlay no-print" onclick="closePricesOverlay(event)">
-      <div class="modal-sheet" style="max-width:540px;">
+      <div class="modal-sheet" style="max-width:580px;padding:20px 24px;">
         <div style="width:36px;height:4px;border-radius:999px;background:var(--border);margin:0 auto 16px;"></div>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-          <div style="width:36px;height:36px;border-radius:10px;background:var(--pro-bg);color:var(--pro);display:flex;align-items:center;justify-content:center;">
+          <div style="width:38px;height:38px;border-radius:10px;background:var(--pro-bg);color:var(--pro);display:flex;align-items:center;justify-content:center;">
             ${ic('sliders', 18)}
           </div>
           <div>
-            <h2 style="font-size:16px;font-weight:900;color:var(--text);">Matriz de Precios Base [PRO]</h2>
-            <p style="font-size:11.5px;color:var(--text3);">Tarifas de referencia comercial para ${cInfo.name} (${cInfo.symbol})</p>
+            <h2 style="font-size:16px;font-weight:900;color:var(--text);">Matriz de Precios Base de Referencia</h2>
+            <p style="font-size:11.5px;color:var(--text3);">Tarifas vigentes para ${cInfo.name} (${cInfo.symbol}) · Actualizado: ${fecha}</p>
           </div>
         </div>
-        <div style="max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;font-size:12px;">
-          <div style="padding:8px 10px;background:var(--surface2);border-radius:8px;color:var(--text2);line-height:1.4;">
-            El catálogo técnico de insumos utiliza precios actualizados por país (AR, ES, US) con margen de merma y cómputo de mano de obra en tiempo real.
-          </div>
+
+        <div style="padding:10px 12px;background:var(--accent-bg);border-radius:10px;color:var(--accent-h);font-size:11.5px;line-height:1.45;margin-bottom:12px;">
+          💡 <b>¿Dónde editar los precios?</b> Puedes actualizar cualquier costo de materiales o mano de obra abriendo el archivo <code>precios-referencia.js</code> en la raíz del proyecto.
         </div>
-        <div style="display:flex;gap:8px;margin-top:14px;">
-          <button onclick="closePricesModal()" class="btn btn-ghost btn-md" style="flex:1;">Cerrar</button>
+
+        <div style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;font-size:12px;padding-right:4px;">
+          ${Object.entries(CATEGORIES_CATALOG).map(([catKey, cat]) => `
+            <div style="border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--surface);">
+              <div style="font-weight:800;font-size:12.5px;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                <span>${cat.title}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:5px;">
+                ${cat.groups.flatMap(g => g.items).slice(0, 5).map(it => {
+                  const p = it.prices[S.country] || it.prices.ar;
+                  return `
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:3px 0;border-bottom:1px dashed var(--border);">
+                      <span style="color:var(--text2);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${it.name} (${it.unit})</span>
+                      <span style="font-weight:700;color:var(--text);">Mat: ${curFmt(p.mat)} | M.O: ${curFmt(p.mo)}</span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button onclick="closePricesModal()" class="btn btn-primary btn-md" style="flex:1;">
+            Aceptar y Cerrar
+          </button>
         </div>
       </div>
     </div>
@@ -4033,17 +4153,38 @@ function addAiItemsToBudget(msgIndex) {
   if (!msg || !msg.items || msg.items.length === 0) return;
 
   const count = msg.items.length;
+  const desp = S.cliente.desp || 0.10;
+
   msg.items.forEach(it => {
+    const qty = it.qty || 1;
+    const unitMat = it.unitPrice || 0;
+    const unitMO = it.laborUnitPrice || 0;
+    const matBase = qty * unitMat;
+    const merma = matBase * desp;
+    const subtMat = matBase + merma;
+    const subtMO = qty * unitMO;
+    const gan = 0.20 * (subtMat + subtMO);
+    const total = subtMat + subtMO + gan;
+
     S.items.push({
-      _id: Date.now() + Math.random(),
-      desc: it.name,
-      cant: it.qty || 1,
-      un: it.unit || 'un',
-      puMat: it.unitPrice || 0,
-      puMo: it.laborUnitPrice || 0,
-      subMat: 0,
-      subMo: 0,
-      total: 0
+      id: ++S._id,
+      catId: it.category || 'libre',
+      catalogId: it.id || ('ai_' + Date.now() + Math.random()),
+      nombre: it.name,
+      nombre_es: it.name,
+      nombre_en: it.name,
+      groupName: 'Asistente IA',
+      qty: qty,
+      unidad: it.unit || 'u',
+      unitMat,
+      unitMO,
+      matBase,
+      merma,
+      subtMat,
+      subtMO,
+      gan,
+      total,
+      opts: {}
     });
   });
 
@@ -4059,7 +4200,7 @@ function addAiItemsToBudget(msgIndex) {
 
   // Smooth scroll to items table
   setTimeout(() => {
-    const el = document.getElementById('items-container') || document.querySelector('.table-wrap');
+    const el = document.getElementById('items-container') || document.querySelector('.table-wrap') || document.querySelector('.item-row');
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, 150);
 }
